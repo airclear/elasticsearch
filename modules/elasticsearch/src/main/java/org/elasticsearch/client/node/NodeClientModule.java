@@ -29,11 +29,16 @@ import org.elasticsearch.common.inject.AbstractModule;
  * @author kimchy (shay.banon)
  */
 public class NodeClientModule extends AbstractModule {
+    private final Settings settings;
+
+    public NodeClientModule(Settings settings) {
+        this.settings = settings;
+    }
 
     @Override protected void configure() {
         bind(ClusterAdminClient.class).to(NodeClusterAdminClient.class).asEagerSingleton();
         bind(IndicesAdminClient.class).to(NodeIndicesAdminClient.class).asEagerSingleton();
         bind(AdminClient.class).to(NodeAdminClient.class).asEagerSingleton();
-        bind(Client.class).to(NodeClient.class).asEagerSingleton();
+        bind(Client.class).to(settings.getAsClass("client.type", NodeClient.class, "org.elasticsearch.client.node", "Client")).asEagerSingleton();
     }
 }
