@@ -1,1 +1,1 @@
-cd build/distributions/exploded && ./bin/elasticsearch -f
+cd build/distributions/exploded && ./bin/elasticsearch -f $*
