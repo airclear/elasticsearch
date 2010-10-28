@@ -19,11 +19,16 @@
 
 package org.elasticsearch.plugin.lruclient;
 
+import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map.Entry;
+import java.util.Set;
 import org.elasticsearch.action.ActionFuture;
 import org.elasticsearch.action.ActionListener;
+import org.elasticsearch.action.ActionRequest;
+import org.elasticsearch.action.admin.indices.status.ShardStatus;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
 import org.elasticsearch.action.bulk.TransportBulkAction;
@@ -51,6 +56,7 @@ import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.index.shard.IndexShardState;
 import org.elasticsearch.indices.IndexMissingException;
 import org.elasticsearch.threadpool.ThreadPool;
 
@@ -60,7 +66,7 @@ public class LruClient extends NodeClient {
     private final LruCache cache;
 
     private class LruCache extends LinkedHashMap<String, Date> {
-        private int capacity = 1;
+        private int capacity;
         public LruCache(int capacity) {
             super(capacity,0.75f,true);
             this.capacity = capacity;
@@ -86,21 +92,29 @@ public class LruClient extends NodeClient {
         super(settings,threadPool,admin,indexAction,deleteAction,bulkAction,deleteByQueryAction,getAction,countAction,searchAction,searchScrollAction,moreLikeThisAction);
         this.logger = Loggers.getLogger(getClass());
         this.cache = new LruCache(settings.getAsInt("node.lrucache.size", 1));
-        logger.debug("LruClient",new Exception("DEBUG"));
     }
 
     private void ensureOpen(final String index) {
         if(!this.cache.containsKey(index)) {
             logger.debug("Index {} not found!  Try to open...", index);
-            // force in foreground...
             try {
                 admin().indices().prepareOpen(index).execute().actionGet();
+
+                // need to wait till all shards are allocated!
+                ShardStatus [] stats = admin().indices().prepareStatus(new String[]{index}).execute().actionGet().getShards();
+                boolean ready = true;
+                for(int i=0;i<stats.length;i++) {
+                    if(stats[i].getState() != IndexShardState.STARTED) {
+                        ready = false;
+                        break;
+                    }
+                }
             }
             catch(IndexMissingException e) {
-                // ignore
                 logger.debug("Index {} does not exist!  Can't open.", index);
             }
         }
+        
         this.cache.put(index, new Date());
     }
 
@@ -135,11 +149,13 @@ public class LruClient extends NodeClient {
 
     @Override public ActionFuture<BulkResponse> bulk(BulkRequest request) {
         logger.debug("bulk");
+        ensureOpen(getIndices(request));
         return super.bulk(request);
     }
 
     @Override public void bulk(BulkRequest request, ActionListener<BulkResponse> listener) {
         logger.debug("bulk");
+        ensureOpen(getIndices(request));
         super.bulk(request,listener);
     }
 
@@ -212,5 +228,19 @@ public class LruClient extends NodeClient {
         ensureOpen(request.index());
         super.moreLikeThis(request, listener);
     }
-    
+
+    private String [] getIndices(BulkRequest request) {
+        Set<String> indices = new HashSet<String>();
+        for(ActionRequest r : request.requests) {
+            if(r instanceof IndexRequest) {
+                indices.add(((IndexRequest)r).index());
+            }
+            else if(r instanceof DeleteRequest) {
+                indices.add(((DeleteRequest)r).index());
+            }
+        }
+        return indices.toArray(new String[indices.size()]);
+    }
+
+
 }
