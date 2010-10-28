@@ -97,30 +97,49 @@ public class LruClient extends NodeClient {
     private void ensureOpen(final String index) {
         if(!this.cache.containsKey(index)) {
             logger.debug("Index {} not found!  Try to open...", index);
-            try {
-                admin().indices().prepareOpen(index).execute().actionGet();
-
-                // need to wait till all shards are allocated!
-                ShardStatus [] stats = admin().indices().prepareStatus(new String[]{index}).execute().actionGet().getShards();
-                boolean ready = true;
-                for(int i=0;i<stats.length;i++) {
-                    if(stats[i].getState() != IndexShardState.STARTED) {
-                        ready = false;
-                        break;
-                    }
-                }
-            }
-            catch(IndexMissingException e) {
-                logger.debug("Index {} does not exist!  Can't open.", index);
-            }
-        }
-        
+            openIndex(index);            
+        }        
         this.cache.put(index, new Date());
     }
 
     private void ensureOpen(final String [] indices) {
         for(int i = 0; i<indices.length; i++)
             ensureOpen(indices[i]);
+    }
+
+    private void openIndex(final String index) {
+        try {
+            admin().indices().prepareOpen(index).execute().actionGet();
+            waitForReadyState(index);
+        }
+        catch(IndexMissingException e) {
+            logger.debug("Index {} does not exist!  Can't open.", index);
+        }
+    }
+
+    private void waitForReadyState(final String index) {
+        boolean notReady = true;
+        while(notReady) {
+            // need to wait till all shards are allocated!
+            logger.debug("Checking for state in index {}",index);
+            ShardStatus [] stats = admin().indices().prepareStatus(new String[]{index}).execute().actionGet().getShards();
+            logger.debug("Checking for state in index {} with # shards: {}",index,stats.length);
+            if(stats.length<1) {
+                logger.debug("No shards found for index {}!!",index);
+                try { Thread.sleep(500); } catch(InterruptedException e) {}
+                continue;
+            }
+            notReady = false;
+            for(int i=0;i<stats.length;i++) {
+                logger.debug("Index {} Shard {} State {}",index,stats[i].getShardId(),stats[i].getState());
+                if(stats[i].getState() != IndexShardState.STARTED) {
+                    try { Thread.sleep(500); } catch(InterruptedException e) {}
+                    notReady = true;
+                    break;
+                }
+            }
+        }
+        logger.debug("Index {} all shards STARTED!",index);
     }
 
     private void closeIndex(final String index) {
