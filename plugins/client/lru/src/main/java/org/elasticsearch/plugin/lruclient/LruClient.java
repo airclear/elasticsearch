@@ -23,8 +23,10 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.elasticsearch.action.ActionFuture;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.ActionRequest;
@@ -63,7 +65,7 @@ import org.elasticsearch.threadpool.ThreadPool;
 public class LruClient extends NodeClient {
     
     private final ESLogger logger;
-    private final LruCache cache;
+    private final Map cache;
 
     private class LruCache extends LinkedHashMap<String, Date> {
         private int capacity;
@@ -91,15 +93,17 @@ public class LruClient extends NodeClient {
                               TransportMoreLikeThisAction moreLikeThisAction) {
         super(settings,threadPool,admin,indexAction,deleteAction,bulkAction,deleteByQueryAction,getAction,countAction,searchAction,searchScrollAction,moreLikeThisAction);
         this.logger = Loggers.getLogger(getClass());
-        this.cache = new LruCache(settings.getAsInt("node.lrucache.size", 1));
+        this.cache = Collections.synchronizedMap(new LruCache(settings.getAsInt("node.lrucache.size", 1)));
     }
 
     private void ensureOpen(final String index) {
-        if(!this.cache.containsKey(index)) {
-            logger.debug("Index {} not found!  Try to open...", index);
-            openIndex(index);            
-        }        
-        this.cache.put(index, new Date());
+        synchronized(index.intern()) {
+            if(!this.cache.containsKey(index)) {
+                logger.debug("Index {} not found!  Try to open...", index);
+                openIndex(index);
+            }
+            this.cache.put(index, new Date());
+        }
     }
 
     private void ensureOpen(final String [] indices) {
@@ -119,7 +123,12 @@ public class LruClient extends NodeClient {
 
     private void waitForReadyState(final String index) {
         boolean notReady = true;
+        long stop=System.nanoTime()+TimeUnit.SECONDS.toNanos(10);
         while(notReady) {
+            if(stop<System.nanoTime()) {
+                logger.debug("Timeout waiting for status of index {}",index);
+                break;
+            }
             // need to wait till all shards are allocated!
             logger.debug("Checking for state in index {}",index);
             ShardStatus [] stats = admin().indices().prepareStatus(new String[]{index}).execute().actionGet().getShards();
