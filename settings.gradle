@@ -26,6 +26,7 @@ include 'plugins-river-rabbitmq'
 include 'plugins-river-couchdb'
 
 include 'plugins-client-lru'
+include 'plugins-cassandra'
 
 rootProject.name = 'elasticsearch-root'
 rootProject.children.each {project ->
