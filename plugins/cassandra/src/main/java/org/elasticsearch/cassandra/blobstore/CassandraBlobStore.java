@@ -19,13 +19,12 @@
 
 package org.elasticsearch.cassandra.blobstore;
 
-//import com.amazonaws.services.s3.AmazonS3;
-//import com.amazonaws.services.s3.model.ObjectListing;
-//import com.amazonaws.services.s3.model.S3ObjectSummary;
 import org.elasticsearch.common.blobstore.BlobPath;
 import org.elasticsearch.common.blobstore.BlobStore;
 import org.elasticsearch.common.blobstore.ImmutableBlobContainer;
 import org.elasticsearch.common.component.AbstractComponent;
+import org.elasticsearch.common.logging.ESLogger;
+import org.elasticsearch.common.logging.Loggers;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.ByteSizeUnit;
 import org.elasticsearch.common.unit.ByteSizeValue;
@@ -38,62 +37,32 @@ import java.util.concurrent.Executor;
  */
 public class CassandraBlobStore extends AbstractComponent implements BlobStore {
 
-    //XXX private final AmazonS3 client;
+    private final ESLogger logger = Loggers.getLogger(getClass());
 
-    //XXX private final String bucket;
+    private final Executor executor;
 
-    //XXX private final String region;
+    private final int bufferSizeInBytes; // XXX
 
-    //XXX private final Executor executor;
-
-    //XXX private final int bufferSizeInBytes;
-
-    public CassandraBlobStore(Settings settings, /*AmazonS3 client, */ String bucket, @Nullable String region, Executor executor) {
+    // XXX executor is a java.util.concurrent.ThreadPoolExecutor
+    public CassandraBlobStore(Settings settings, Executor executor) {
         super(settings);
-        /* XXX
-        this.client = client;
-        this.bucket = bucket;
-        this.region = region;
+
         this.executor = executor;
 
         this.bufferSizeInBytes = (int) settings.getAsBytesSize("buffer_size", new ByteSizeValue(100, ByteSizeUnit.KB)).bytes();
 
-        if (!client.doesBucketExist(bucket)) {
-            if (region != null) {
-                client.createBucket(bucket, region);
-            } else {
-                client.createBucket(bucket);
-            }
-        }
-        */
+        logger.debug("CassandraBlobStore executor={}, bufferSizeInBytes={}", executor, bufferSizeInBytes);
     }
 
     @Override public String toString() {
-    /* XXX
-        return (region == null ? "" : region + "/") + bucket;
-    */
-        return null;
+        return "cassandra"; // XXX
     }
 
-    /* XXX
-    public AmazonS3 client() {
-        return client;
-    }
-    */
-
-    /* XXX
-    public String bucket() {
-        return bucket;
-    }
-    */
-
-    /* XXX
     public Executor executor() {
         return executor;
     }
-    */
 
-    /*
+    /* XXX
     public int bufferSizeInBytes() {
         return bufferSizeInBytes;
     }
@@ -104,7 +73,8 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
     }
 
     @Override public void delete(BlobPath path) {
-        /* XXX
+        logger.debug("TODO delete path={}", path);
+        /* XXX TODO
         ObjectListing prevListing = null;
         while (true) {
             ObjectListing list;

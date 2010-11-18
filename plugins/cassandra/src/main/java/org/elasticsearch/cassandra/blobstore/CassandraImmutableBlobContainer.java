@@ -19,8 +19,6 @@
 
 package org.elasticsearch.cassandra.blobstore;
 
-//import com.amazonaws.services.s3.model.ObjectMetadata;
-//import com.amazonaws.services.s3.model.PutObjectResult;
 import org.elasticsearch.common.blobstore.BlobPath;
 import org.elasticsearch.common.blobstore.ImmutableBlobContainer;
 import org.elasticsearch.common.blobstore.support.BlobStores;
@@ -38,20 +36,17 @@ public class CassandraImmutableBlobContainer extends AbstractCassandraBlobContai
     }
 
     @Override public void writeBlob(final String blobName, final InputStream is, final long sizeInBytes, final WriterListener listener) {
-        /* XXX
         blobStore.executor().execute(new Runnable() {
             @Override public void run() {
                 try {
-                    ObjectMetadata md = new ObjectMetadata();
-                    md.setContentLength(sizeInBytes);
-                    PutObjectResult objectResult = blobStore.client().putObject(blobStore.bucket(), buildKey(blobName), is, md);
+                    // XXX TODO
+                    logger.debug("TODO writeBlob blobName={}, sizeInBytes={}, is={}", blobName, sizeInBytes, is);
                     listener.onCompleted();
                 } catch (Exception e) {
                     listener.onFailure(e);
                 }
             }
         });
-        */
     }
 
     @Override public void writeBlob(String blobName, InputStream is, long sizeInBytes) throws IOException {

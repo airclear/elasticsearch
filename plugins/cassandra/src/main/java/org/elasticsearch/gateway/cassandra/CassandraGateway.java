@@ -21,8 +21,7 @@ package org.elasticsearch.gateway.cassandra;
 
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.ElasticSearchIllegalArgumentException;
-//import org.elasticsearch.cloud.aws.AwsS3Service;
-//import org.elasticsearch.cloud.aws.blobstore.S3BlobStore;
+import org.elasticsearch.cassandra.blobstore.CassandraBlobStore;
 import org.elasticsearch.cluster.ClusterName;
 import org.elasticsearch.cluster.ClusterService;
 import org.elasticsearch.cluster.metadata.MetaDataCreateIndexService;
@@ -43,22 +42,14 @@ import java.io.IOException;
 public class CassandraGateway extends BlobStoreGateway {
 
     @Inject public CassandraGateway(Settings settings, ClusterService clusterService, MetaDataCreateIndexService createIndexService,
-    ClusterName clusterName, ThreadPool threadPool /* XXX , AwsS3Service s3Service*/) throws IOException {
+    ClusterName clusterName, ThreadPool threadPool) throws IOException {
         super(settings, clusterService, createIndexService);
         
-        /* XXX
-        String bucket = componentSettings.get("bucket");
-        if (bucket == null) {
-            throw new ElasticSearchIllegalArgumentException("No bucket defined for s3 gateway");
-        }
-
-        String region = componentSettings.get("region");
         ByteSizeValue chunkSize = componentSettings.getAsBytesSize("chunk_size", new ByteSizeValue(100, ByteSizeUnit.MB));
 
-        logger.debug("using bucket [{}], region [{}], chunk_size [{}]", bucket, region, chunkSize);
+        logger.debug("using chunk_size [{}]", chunkSize);
 
-        initialize(new S3BlobStore(settings, s3Service.client(), bucket, region, threadPool.cached()), clusterName, chunkSize);
-        */
+        initialize(new CassandraBlobStore(settings, threadPool.cached()), clusterName, chunkSize);
     }
 
     @Override public void close() throws ElasticSearchException {

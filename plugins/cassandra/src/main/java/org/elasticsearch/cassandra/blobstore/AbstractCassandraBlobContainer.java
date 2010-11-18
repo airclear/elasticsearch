@@ -19,14 +19,13 @@
 
 package org.elasticsearch.cassandra.blobstore;
 
-//import com.amazonaws.services.s3.model.ObjectListing;
-//import com.amazonaws.services.s3.model.S3Object;
-//import com.amazonaws.services.s3.model.S3ObjectSummary;
 import org.elasticsearch.common.blobstore.BlobMetaData;
 import org.elasticsearch.common.blobstore.BlobPath;
 import org.elasticsearch.common.blobstore.support.AbstractBlobContainer;
 import org.elasticsearch.common.blobstore.support.PlainBlobMetaData;
 import org.elasticsearch.common.collect.ImmutableMap;
+import org.elasticsearch.common.logging.ESLogger;
+import org.elasticsearch.common.logging.Loggers;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -37,19 +36,22 @@ import java.io.InputStream;
  */
 public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
 
+    protected final ESLogger logger = Loggers.getLogger(getClass());
+
     protected final CassandraBlobStore blobStore;
 
-    protected final String keyPath;
+    protected final String keyPath; // XXX
 
     public AbstractCassandraBlobContainer(BlobPath path, CassandraBlobStore blobStore) {
         super(path);
         this.blobStore = blobStore;
         this.keyPath = path.buildAsString("/") + "/";
+        logger.debug("AbstractCassandraBlobContainer path={}", path);
     }
 
     @Override public boolean blobExists(String blobName) {
         try {
-            //XXX blobStore.client().getObjectMetadata(blobStore.bucket(), buildKey(blobName));
+            logger.debug("TODO blobExists blobName={}", blobName);
             return true;
         } catch (Exception e) {
             return false;
@@ -57,11 +59,12 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
     }
 
     @Override public boolean deleteBlob(String blobName) throws IOException {
-        //XXX blobStore.client().deleteObject(blobStore.bucket(), buildKey(blobName));
+        logger.debug("TODO deleteBlob blobName={}", blobName);
         return true;
     }
 
     @Override public void readBlob(final String blobName, final ReadBlobListener listener) {
+        logger.debug("TODO readBlob blobName={}", blobName);
         /* XXX
         blobStore.executor().execute(new Runnable() {
             @Override public void run() {
@@ -94,6 +97,7 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
     }
 
     @Override public ImmutableMap<String, BlobMetaData> listBlobsByPrefix(@Nullable String blobNamePrefix) throws IOException {
+        logger.debug("TODO listBlobsByPrefix blobNamePrefix={}", blobNamePrefix);
         ImmutableMap.Builder<String, BlobMetaData> blobsBuilder = ImmutableMap.builder();
         /* XXX
         ObjectListing prevListing = null;
