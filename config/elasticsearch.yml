@@ -1,13 +1,5 @@
-# use our LruIndex manager
-client:
- type: org.elasticsearch.plugin.lruclient.LruClient
-
-# make sure we store these somewhere as the LruClient closes them locally
 gateway:
-  type: fs
-  fs:
-    # if you don't like the default work/ dif for long term storage
-    location: /var/lib/elasticsearch
+  type: cassandra
 
 index:
   numberOfShards: 1

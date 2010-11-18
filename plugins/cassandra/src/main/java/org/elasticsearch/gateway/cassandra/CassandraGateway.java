@@ -17,12 +17,12 @@
  * under the License.
  */
 
-package org.elasticsearch.gateway.s3;
+package org.elasticsearch.gateway.cassandra;
 
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.ElasticSearchIllegalArgumentException;
-import org.elasticsearch.cloud.aws.AwsS3Service;
-import org.elasticsearch.cloud.aws.blobstore.S3BlobStore;
+//import org.elasticsearch.cloud.aws.AwsS3Service;
+//import org.elasticsearch.cloud.aws.blobstore.S3BlobStore;
 import org.elasticsearch.cluster.ClusterName;
 import org.elasticsearch.cluster.ClusterService;
 import org.elasticsearch.cluster.metadata.MetaDataCreateIndexService;
@@ -32,20 +32,21 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.ByteSizeUnit;
 import org.elasticsearch.common.unit.ByteSizeValue;
 import org.elasticsearch.gateway.blobstore.BlobStoreGateway;
-import org.elasticsearch.index.gateway.s3.S3IndexGatewayModule;
+import org.elasticsearch.index.gateway.cassandra.CassandraIndexGatewayModule;
 import org.elasticsearch.threadpool.ThreadPool;
 
 import java.io.IOException;
 
 /**
- * @author kimchy (shay.banon)
+ * @author Tom May (tom@gist.com)
  */
-public class S3Gateway extends BlobStoreGateway {
+public class CassandraGateway extends BlobStoreGateway {
 
-    @Inject public S3Gateway(Settings settings, ClusterService clusterService, MetaDataCreateIndexService createIndexService,
-                             ClusterName clusterName, ThreadPool threadPool, AwsS3Service s3Service) throws IOException {
+    @Inject public CassandraGateway(Settings settings, ClusterService clusterService, MetaDataCreateIndexService createIndexService,
+    ClusterName clusterName, ThreadPool threadPool /* XXX , AwsS3Service s3Service*/) throws IOException {
         super(settings, clusterService, createIndexService);
-
+        
+        /* XXX
         String bucket = componentSettings.get("bucket");
         if (bucket == null) {
             throw new ElasticSearchIllegalArgumentException("No bucket defined for s3 gateway");
@@ -57,6 +58,7 @@ public class S3Gateway extends BlobStoreGateway {
         logger.debug("using bucket [{}], region [{}], chunk_size [{}]", bucket, region, chunkSize);
 
         initialize(new S3BlobStore(settings, s3Service.client(), bucket, region, threadPool.cached()), clusterName, chunkSize);
+        */
     }
 
     @Override public void close() throws ElasticSearchException {
@@ -64,10 +66,10 @@ public class S3Gateway extends BlobStoreGateway {
     }
 
     @Override public String type() {
-        return "s3";
+        return "cassandra";
     }
 
     @Override public Class<? extends Module> suggestIndexGateway() {
-        return S3IndexGatewayModule.class;
+        return CassandraIndexGatewayModule.class;
     }
 }

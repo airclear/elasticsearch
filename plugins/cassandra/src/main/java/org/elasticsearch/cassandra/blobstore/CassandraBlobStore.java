@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package org.elasticsearch.cloud.aws.blobstore;
+package org.elasticsearch.cassandra.blobstore;
 
-import com.amazonaws.services.s3.AmazonS3;
-import com.amazonaws.services.s3.model.ObjectListing;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
+//import com.amazonaws.services.s3.AmazonS3;
+//import com.amazonaws.services.s3.model.ObjectListing;
+//import com.amazonaws.services.s3.model.S3ObjectSummary;
 import org.elasticsearch.common.blobstore.BlobPath;
 import org.elasticsearch.common.blobstore.BlobStore;
 import org.elasticsearch.common.blobstore.ImmutableBlobContainer;
@@ -34,22 +34,23 @@ import javax.annotation.Nullable;
 import java.util.concurrent.Executor;
 
 /**
- * @author kimchy (shay.banon)
+ * @author Tom May (tom@gist.com)
  */
-public class S3BlobStore extends AbstractComponent implements BlobStore {
+public class CassandraBlobStore extends AbstractComponent implements BlobStore {
 
-    private final AmazonS3 client;
+    //XXX private final AmazonS3 client;
 
-    private final String bucket;
+    //XXX private final String bucket;
 
-    private final String region;
+    //XXX private final String region;
 
-    private final Executor executor;
+    //XXX private final Executor executor;
 
-    private final int bufferSizeInBytes;
+    //XXX private final int bufferSizeInBytes;
 
-    public S3BlobStore(Settings settings, AmazonS3 client, String bucket, @Nullable String region, Executor executor) {
+    public CassandraBlobStore(Settings settings, /*AmazonS3 client, */ String bucket, @Nullable String region, Executor executor) {
         super(settings);
+        /* XXX
         this.client = client;
         this.bucket = bucket;
         this.region = region;
@@ -64,33 +65,46 @@ public class S3BlobStore extends AbstractComponent implements BlobStore {
                 client.createBucket(bucket);
             }
         }
+        */
     }
 
     @Override public String toString() {
+    /* XXX
         return (region == null ? "" : region + "/") + bucket;
+    */
+        return null;
     }
 
+    /* XXX
     public AmazonS3 client() {
         return client;
     }
+    */
 
+    /* XXX
     public String bucket() {
         return bucket;
     }
+    */
 
+    /* XXX
     public Executor executor() {
         return executor;
     }
+    */
 
+    /*
     public int bufferSizeInBytes() {
         return bufferSizeInBytes;
     }
+    */
 
     @Override public ImmutableBlobContainer immutableBlobContainer(BlobPath path) {
-        return new S3ImmutableBlobContainer(path, this);
+        return new CassandraImmutableBlobContainer(path, this);
     }
 
     @Override public void delete(BlobPath path) {
+        /* XXX
         ObjectListing prevListing = null;
         while (true) {
             ObjectListing list;
@@ -108,6 +122,7 @@ public class S3BlobStore extends AbstractComponent implements BlobStore {
                 break;
             }
         }
+        */
     }
 
     @Override public void close() {

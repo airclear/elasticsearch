@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package org.elasticsearch.index.gateway.s3;
+package org.elasticsearch.index.gateway.cassandra;
 
 import org.elasticsearch.common.inject.AbstractModule;
 import org.elasticsearch.index.gateway.IndexGateway;
 
 /**
- * @author kimchy (shay.banon)
+ * @author Tom May (tom@gist.com)
  */
-public class S3IndexGatewayModule extends AbstractModule {
+public class CassandraIndexGatewayModule extends AbstractModule {
 
     @Override protected void configure() {
-        bind(IndexGateway.class).to(S3IndexGateway.class).asEagerSingleton();
+        bind(IndexGateway.class).to(CassandraIndexGateway.class).asEagerSingleton();
     }
 }

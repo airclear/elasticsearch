@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.elasticsearch.index.gateway.s3;
+package org.elasticsearch.index.gateway.cassandra;
 
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
@@ -30,17 +30,17 @@ import org.elasticsearch.index.store.Store;
 import org.elasticsearch.threadpool.ThreadPool;
 
 /**
- * @author kimchy (shay.banon)
+ * @author Tom May (tom@gist.com)
  */
-public class S3IndexShardGateway extends BlobStoreIndexShardGateway {
+public class CassandraIndexShardGateway extends BlobStoreIndexShardGateway {
 
-    @Inject public S3IndexShardGateway(ShardId shardId, @IndexSettings Settings indexSettings, ThreadPool threadPool, IndexGateway indexGateway,
+    @Inject public CassandraIndexShardGateway(ShardId shardId, @IndexSettings Settings indexSettings, ThreadPool threadPool, IndexGateway indexGateway,
                                        IndexShard indexShard, Store store) {
         super(shardId, indexSettings, threadPool, indexGateway, indexShard, store);
     }
 
     @Override public String type() {
-        return "s3";
+        return "cassandra";
     }
 }
 

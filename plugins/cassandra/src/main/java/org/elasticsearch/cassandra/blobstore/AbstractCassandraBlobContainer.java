@@ -17,11 +17,11 @@
  * under the License.
  */
 
-package org.elasticsearch.cloud.aws.blobstore;
+package org.elasticsearch.cassandra.blobstore;
 
-import com.amazonaws.services.s3.model.ObjectListing;
-import com.amazonaws.services.s3.model.S3Object;
-import com.amazonaws.services.s3.model.S3ObjectSummary;
+//import com.amazonaws.services.s3.model.ObjectListing;
+//import com.amazonaws.services.s3.model.S3Object;
+//import com.amazonaws.services.s3.model.S3ObjectSummary;
 import org.elasticsearch.common.blobstore.BlobMetaData;
 import org.elasticsearch.common.blobstore.BlobPath;
 import org.elasticsearch.common.blobstore.support.AbstractBlobContainer;
@@ -33,15 +33,15 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * @author kimchy (shay.banon)
+ * @author Tom May (tom@gist.com)
  */
-public class AbstarctS3BlobContainer extends AbstractBlobContainer {
+public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
 
-    protected final S3BlobStore blobStore;
+    protected final CassandraBlobStore blobStore;
 
     protected final String keyPath;
 
-    public AbstarctS3BlobContainer(BlobPath path, S3BlobStore blobStore) {
+    public AbstractCassandraBlobContainer(BlobPath path, CassandraBlobStore blobStore) {
         super(path);
         this.blobStore = blobStore;
         this.keyPath = path.buildAsString("/") + "/";
@@ -49,7 +49,7 @@ public class AbstarctS3BlobContainer extends AbstractBlobContainer {
 
     @Override public boolean blobExists(String blobName) {
         try {
-            blobStore.client().getObjectMetadata(blobStore.bucket(), buildKey(blobName));
+            //XXX blobStore.client().getObjectMetadata(blobStore.bucket(), buildKey(blobName));
             return true;
         } catch (Exception e) {
             return false;
@@ -57,11 +57,12 @@ public class AbstarctS3BlobContainer extends AbstractBlobContainer {
     }
 
     @Override public boolean deleteBlob(String blobName) throws IOException {
-        blobStore.client().deleteObject(blobStore.bucket(), buildKey(blobName));
+        //XXX blobStore.client().deleteObject(blobStore.bucket(), buildKey(blobName));
         return true;
     }
 
     @Override public void readBlob(final String blobName, final ReadBlobListener listener) {
+        /* XXX
         blobStore.executor().execute(new Runnable() {
             @Override public void run() {
                 InputStream is;
@@ -89,10 +90,12 @@ public class AbstarctS3BlobContainer extends AbstractBlobContainer {
                 }
             }
         });
+        */
     }
 
     @Override public ImmutableMap<String, BlobMetaData> listBlobsByPrefix(@Nullable String blobNamePrefix) throws IOException {
         ImmutableMap.Builder<String, BlobMetaData> blobsBuilder = ImmutableMap.builder();
+        /* XXX
         ObjectListing prevListing = null;
         while (true) {
             ObjectListing list;
@@ -115,6 +118,7 @@ public class AbstarctS3BlobContainer extends AbstractBlobContainer {
                 break;
             }
         }
+        */
         return blobsBuilder.build();
     }
 
@@ -122,7 +126,9 @@ public class AbstarctS3BlobContainer extends AbstractBlobContainer {
         return listBlobsByPrefix(null);
     }
 
+    /* XXX
     protected String buildKey(String blobName) {
         return keyPath + blobName;
     }
+    */
 }

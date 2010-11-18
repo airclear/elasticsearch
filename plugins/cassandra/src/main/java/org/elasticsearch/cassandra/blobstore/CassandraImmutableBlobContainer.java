@@ -17,10 +17,10 @@
  * under the License.
  */
 
-package org.elasticsearch.cloud.aws.blobstore;
+package org.elasticsearch.cassandra.blobstore;
 
-import com.amazonaws.services.s3.model.ObjectMetadata;
-import com.amazonaws.services.s3.model.PutObjectResult;
+//import com.amazonaws.services.s3.model.ObjectMetadata;
+//import com.amazonaws.services.s3.model.PutObjectResult;
 import org.elasticsearch.common.blobstore.BlobPath;
 import org.elasticsearch.common.blobstore.ImmutableBlobContainer;
 import org.elasticsearch.common.blobstore.support.BlobStores;
@@ -29,15 +29,16 @@ import java.io.IOException;
 import java.io.InputStream;
 
 /**
- * @author kimchy (shay.banon)
+ * @author Tom May (tom@gist.com)
  */
-public class S3ImmutableBlobContainer extends AbstarctS3BlobContainer implements ImmutableBlobContainer {
+public class CassandraImmutableBlobContainer extends AbstractCassandraBlobContainer implements ImmutableBlobContainer {
 
-    public S3ImmutableBlobContainer(BlobPath path, S3BlobStore blobStore) {
+    public CassandraImmutableBlobContainer(BlobPath path, CassandraBlobStore blobStore) {
         super(path, blobStore);
     }
 
     @Override public void writeBlob(final String blobName, final InputStream is, final long sizeInBytes, final WriterListener listener) {
+        /* XXX
         blobStore.executor().execute(new Runnable() {
             @Override public void run() {
                 try {
@@ -50,6 +51,7 @@ public class S3ImmutableBlobContainer extends AbstarctS3BlobContainer implements
                 }
             }
         });
+        */
     }
 
     @Override public void writeBlob(String blobName, InputStream is, long sizeInBytes) throws IOException {

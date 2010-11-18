@@ -3,9 +3,11 @@ dependsOn(':elasticsearch')
 apply plugin: 'java'
 apply plugin: 'maven'
 
-archivesBaseName = "elasticsearch-cloud-aws"
+archivesBaseName = "elasticsearch-cassandra"
 
 explodedDistDir = new File(distsDir, 'exploded')
+
+manifest.mainAttributes("Implementation-Title": "ElasticSearch::Plugins::CassandraGatewayPlugin", "Implementation-Version": rootProject.version, "Implementation-Date": buildTimeStr)
 
 configurations.compile.transitive = true
 configurations.testCompile.transitive = true
@@ -14,12 +16,10 @@ configurations.testCompile.transitive = true
 sourceSets.main.resources.srcDirs 'src/main/java'
 sourceSets.test.resources.srcDirs 'src/test/java'
 
-jar {
+// add the source files to the dist jar
+//jar {
 //    from sourceSets.main.allJava
-    manifest {
-        attributes("Implementation-Title": "ElasticSearch", "Implementation-Version": rootProject.version, "Implementation-Date": buildTimeStr)
-    }
-}
+//}
 
 configurations {
     dists
@@ -31,15 +31,6 @@ configurations {
 
 dependencies {
     compile project(':elasticsearch')
-    compile("com.amazonaws:aws-java-sdk:1.0.11") { transitive = false }
-    runtime("commons-logging:commons-logging:1.1.1") { transitive = false }
-    runtime("commons-codec:commons-codec:1.3") { transitive = false }
-    runtime("commons-httpclient:commons-httpclient:3.0.1") { transitive = false }
-
-    distLib("com.amazonaws:aws-java-sdk:1.0.11") { transitive = false }
-    distLib("commons-codec:commons-codec:1.3") { transitive = false }
-    distLib("commons-logging:commons-logging:1.1.1") { transitive = false }
-    distLib("commons-httpclient:commons-httpclient:3.0.1") { transitive = false }
 
     testCompile project(':test-testng')
     testCompile('org.testng:testng:5.10:jdk15') { transitive = false }
@@ -47,11 +38,11 @@ dependencies {
 }
 
 test {
-    useTestNG()
-    jmvArgs = ["-ea", "-Xmx1024m"]
-    suiteName = project.name
-    listeners = ["org.elasticsearch.util.testng.Listeners"]
-    systemProperties["es.test.log.conf"] = System.getProperty("es.test.log.conf", "log4j-gradle.properties")
+    //useTestNG()
+    //jmvArgs = ["-ea", "-Xmx1024m"]
+    //suiteName = project.name
+    //listeners = ["org.elasticsearch.util.testng.Listeners"]
+    //systemProperties["es.test.log.conf"] = System.getProperty("es.test.log.conf", "log4j-gradle.properties")
 }
 
 task explodedDist(dependsOn: [jar], description: 'Builds the plugin zip file') << {
@@ -121,9 +112,9 @@ uploadArchives {
         }
 
         pom.project {
-            inceptionYear '2009'
-            name 'elasticsearch-plugins-cloud-aws'
-            description 'Cloud AWS Plugin for ElasticSearch'
+            inceptionYear '2010'
+            name 'elasticsearch-plugins-cassandra'
+            description 'Cassandra Gateway Plugin for ElasticSearch'
             licenses {
                 license {
                     name 'The Apache Software License, Version 2.0'

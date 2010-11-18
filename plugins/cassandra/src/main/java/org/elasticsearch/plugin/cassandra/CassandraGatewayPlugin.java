@@ -17,52 +17,26 @@
  * under the License.
  */
 
-package org.elasticsearch.plugin.cloud.aws;
+package org.elasticsearch.plugin.cassandra;
 
-import org.elasticsearch.cloud.aws.AwsEc2Service;
-import org.elasticsearch.cloud.aws.AwsModule;
-import org.elasticsearch.cloud.aws.AwsS3Service;
-import org.elasticsearch.common.collect.Lists;
-import org.elasticsearch.common.component.LifecycleComponent;
-import org.elasticsearch.common.inject.Module;
-import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.plugins.AbstractPlugin;
 
-import java.util.Collection;
+// Called at startup.  We can get the Setting as a constructor
+// argument, set up injector modules, etc., here if we need to.
+// See for example
+// plugins/cloud/aws/src/main/java/org/elasticsearch/plugin/cloud/aws/CloudAwsPlugin.java
 
 /**
- * @author kimchy (shay.banon)
+ * @author matt.hartzler
+ * @author Tom May (tom@gist.com)
  */
-public class CloudAwsPlugin extends AbstractPlugin {
-
-    private final Settings settings;
-
-    public CloudAwsPlugin(Settings settings) {
-        this.settings = settings;
-    }
+public class CassandraGatewayPlugin extends AbstractPlugin {
 
     @Override public String name() {
-        return "cloud-aws";
+        return "cassandra-gateway";
     }
 
     @Override public String description() {
-        return "Cloud AWS Plugin";
-    }
-
-    @Override public Collection<Class<? extends Module>> modules() {
-        Collection<Class<? extends Module>> modules = Lists.newArrayList();
-        if (settings.getAsBoolean("cloud.enabled", true)) {
-            modules.add(AwsModule.class);
-        }
-        return modules;
-    }
-
-    @Override public Collection<Class<? extends LifecycleComponent>> services() {
-        Collection<Class<? extends LifecycleComponent>> services = Lists.newArrayList();
-        if (settings.getAsBoolean("cloud.enabled", true)) {
-            services.add(AwsS3Service.class);
-            services.add(AwsEc2Service.class);
-        }
-        return services;
+        return "Cassandra Gateway";
     }
 }

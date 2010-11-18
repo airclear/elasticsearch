@@ -17,17 +17,17 @@
  * under the License.
  */
 
-package org.elasticsearch.gateway.s3;
+package org.elasticsearch.gateway.cassandra;
 
 import org.elasticsearch.gateway.Gateway;
 import org.elasticsearch.gateway.blobstore.BlobStoreGatewayModule;
 
 /**
- * @author kimchy (shay.banon)
+ * @author Tom May (tom@gist.com)
  */
-public class S3GatewayModule extends BlobStoreGatewayModule {
+public class CassandraGatewayModule extends BlobStoreGatewayModule {
 
     @Override protected void configure() {
-        bind(Gateway.class).to(S3Gateway.class).asEagerSingleton();
+        bind(Gateway.class).to(CassandraGateway.class).asEagerSingleton();
     }
 }
