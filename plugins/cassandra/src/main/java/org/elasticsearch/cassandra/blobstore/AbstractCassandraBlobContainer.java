@@ -27,25 +27,45 @@ import org.elasticsearch.common.collect.ImmutableMap;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
 
+import org.apache.cassandra.thrift.Column;
+import org.apache.cassandra.thrift.ColumnParent;
+import org.apache.cassandra.thrift.ColumnOrSuperColumn;
+import org.apache.cassandra.thrift.ConsistencyLevel;
+import org.apache.cassandra.thrift.Cassandra;
+import org.apache.cassandra.thrift.InvalidRequestException;
+import org.apache.cassandra.thrift.Mutation;
+import org.apache.cassandra.thrift.SlicePredicate;
+import org.apache.cassandra.thrift.SliceRange;
+import org.apache.cassandra.thrift.TimedOutException;
+import org.apache.cassandra.thrift.UnavailableException;
+
+import org.apache.thrift.TException;
+
 import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.Charset;
+import java.util.List;
 
 /**
  * @author Tom May (tom@gist.com)
  */
 public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
 
+    protected static final Charset utf8 = Charset.forName("UTF-8");
+
     protected final ESLogger logger = Loggers.getLogger(getClass());
 
     protected final CassandraBlobStore blobStore;
 
-    protected final String keyPath; // XXX
+    protected final String blobPath;
+
+    protected static final String keySpace = "ElasticSearch";
 
     public AbstractCassandraBlobContainer(BlobPath path, CassandraBlobStore blobStore) {
         super(path);
         this.blobStore = blobStore;
-        this.keyPath = path.buildAsString("/") + "/";
+        this.blobPath = path.buildAsString("/");
         logger.debug("AbstractCassandraBlobContainer path={}", path);
     }
 
@@ -97,42 +117,55 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
     }
 
     @Override public ImmutableMap<String, BlobMetaData> listBlobsByPrefix(@Nullable String blobNamePrefix) throws IOException {
-        logger.debug("TODO listBlobsByPrefix blobNamePrefix={}", blobNamePrefix);
+        logger.debug("listBlobsByPrefix blobNamePrefix={}", blobNamePrefix);
+
+        List<ColumnOrSuperColumn> columns;
+        Cassandra.Client client = CassandraClientFactory.getCassandraClient();
+        try {
+            columns =
+                client.get_slice(
+                    keySpace,
+                    blobPath,
+                    new ColumnParent("BlobNames"),
+                    new SlicePredicate().setSlice_range(
+                        new SliceRange()
+                        .setStart(new byte[0])
+                        .setFinish(new byte[0])
+                        .setCount(1000000000)),
+                    ConsistencyLevel.QUORUM);
+        }
+        catch (InvalidRequestException ex) {
+            throw new IOException("Cassandra get_slice on ???:??? failed", ex);
+        }
+        catch (UnavailableException ex) {
+            throw new IOException("Cassandra get_slice on ???:??? failed", ex);
+        }
+        catch (TimedOutException ex) {
+            throw new IOException("Cassandra get_slice on ???:??? failed", ex);
+        }
+        catch (TException ex) {
+            throw new IOException("Cassandra get_slice on ???:??? failed", ex);
+        }
+        finally {
+            CassandraClientFactory.closeCassandraClient(client);
+        }
+
         ImmutableMap.Builder<String, BlobMetaData> blobsBuilder = ImmutableMap.builder();
-        /* XXX
-        ObjectListing prevListing = null;
-        while (true) {
-            ObjectListing list;
-            if (prevListing != null) {
-                list = blobStore.client().listNextBatchOfObjects(prevListing);
-            } else {
-                if (blobNamePrefix != null) {
-                    list = blobStore.client().listObjects(blobStore.bucket(), buildKey(blobNamePrefix));
-                } else {
-                    list = blobStore.client().listObjects(blobStore.bucket(), keyPath);
-                }
-            }
-            for (S3ObjectSummary summary : list.getObjectSummaries()) {
-                String name = summary.getKey().substring(keyPath.length());
-                blobsBuilder.put(name, new PlainBlobMetaData(name, summary.getSize()));
-            }
-            if (list.isTruncated()) {
-                prevListing = list;
-            } else {
-                break;
+
+        for (ColumnOrSuperColumn columnOrSuperColumn : columns) {
+            Column column = columnOrSuperColumn.getColumn();
+            String name = new String(column.getName(), utf8);
+            long length = Integer.parseInt(new String(column.getValue(), utf8));
+            logger.debug("name: {}, length: {}", name, length);
+            if (blobNamePrefix == null || name.startsWith(blobNamePrefix)) {
+                blobsBuilder.put(name, new PlainBlobMetaData(name, length));
             }
         }
-        */
+
         return blobsBuilder.build();
     }
 
     @Override public ImmutableMap<String, BlobMetaData> listBlobs() throws IOException {
         return listBlobsByPrefix(null);
     }
-
-    /* XXX
-    protected String buildKey(String blobName) {
-        return keyPath + blobName;
-    }
-    */
 }
