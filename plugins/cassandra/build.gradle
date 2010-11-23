@@ -12,6 +12,8 @@ manifest.mainAttributes("Implementation-Title": "ElasticSearch::Plugins::Cassand
 configurations.compile.transitive = true
 configurations.testCompile.transitive = true
 
+sourceSets.main.java.srcDirs 'src/main/java', 'src/main/gen-java'
+
 // no need to use the resource dir
 sourceSets.main.resources.srcDirs 'src/main/java'
 sourceSets.test.resources.srcDirs 'src/test/java'
