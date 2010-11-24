@@ -27,12 +27,13 @@ import org.elasticsearch.common.collect.ImmutableMap;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
 
+import org.apache.cassandra.thrift.Cassandra;
 import org.apache.cassandra.thrift.Column;
 import org.apache.cassandra.thrift.ColumnParent;
 import org.apache.cassandra.thrift.ColumnPath;
 import org.apache.cassandra.thrift.ColumnOrSuperColumn;
 import org.apache.cassandra.thrift.ConsistencyLevel;
-import org.apache.cassandra.thrift.Cassandra;
+import org.apache.cassandra.thrift.Deletion;
 import org.apache.cassandra.thrift.InvalidRequestException;
 import org.apache.cassandra.thrift.Mutation;
 import org.apache.cassandra.thrift.SlicePredicate;
@@ -46,7 +47,11 @@ import javax.annotation.Nullable;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @author Tom May (tom@gist.com)
@@ -96,12 +101,35 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
             CassandraClientFactory.getCassandraClient();
         try {
             long timestamp = System.currentTimeMillis();
-            client.remove(
-                keySpace,
-                blobKey(blobName),
-                new ColumnPath("Blobs"),
-                timestamp,
-                ConsistencyLevel.QUORUM);
+
+            Map<String, Map<String, List<Mutation>>> mutationMap =
+                new HashMap<String, Map<String, List<Mutation>>>();
+
+           // Delete the blob data from Blobs.
+
+            List<Mutation> blobsMutations = new ArrayList<Mutation>();
+            blobsMutations.add(createDelete(null, timestamp));
+
+            Map<String, List<Mutation>> blobsMutationMap =
+                new HashMap<String, List<Mutation>>();
+            blobsMutationMap.put("Blobs", blobsMutations);
+
+            mutationMap.put(blobKey(blobName), blobsMutationMap);
+
+            // Delete the blobName from BlobNames.
+
+            List<Mutation> blobNamesMutations = new ArrayList<Mutation>();
+            blobNamesMutations.add(createDelete(blobName, timestamp));
+
+            Map<String, List<Mutation>> blobNamesMutationMap =
+                new HashMap<String, List<Mutation>>();
+            blobNamesMutationMap.put("BlobNames", blobNamesMutations);
+
+            mutationMap.put(blobPath, blobNamesMutationMap);
+
+            client.batch_mutate(
+                keySpace, mutationMap, ConsistencyLevel.QUORUM);
+
             return true;
         }
         catch (Exception e) {
@@ -205,5 +233,16 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
 
     protected String blobKey(String blobName) {
         return blobPath + '/' + blobName;
+    }
+
+    private Mutation createDelete(String name, long timestamp) {
+        Deletion deletion = new Deletion(timestamp);
+        if (name != null) {
+            List<ByteBuffer> columnNames = new ArrayList<ByteBuffer>(1);
+            columnNames.add(utf8.encode(name));
+            deletion.setPredicate(
+                new SlicePredicate().setColumn_names(columnNames));
+        }
+        return new Mutation().setDeletion(deletion);
     }
 }
