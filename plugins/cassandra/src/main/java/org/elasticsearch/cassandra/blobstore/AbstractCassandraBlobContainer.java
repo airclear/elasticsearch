@@ -29,6 +29,7 @@ import org.elasticsearch.common.logging.Loggers;
 
 import org.apache.cassandra.thrift.Column;
 import org.apache.cassandra.thrift.ColumnParent;
+import org.apache.cassandra.thrift.ColumnPath;
 import org.apache.cassandra.thrift.ColumnOrSuperColumn;
 import org.apache.cassandra.thrift.ConsistencyLevel;
 import org.apache.cassandra.thrift.Cassandra;
@@ -84,36 +85,40 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
     }
 
     @Override public void readBlob(final String blobName, final ReadBlobListener listener) {
-        logger.debug("TODO readBlob blobName={}", blobName);
-        /* XXX
+        logger.debug("readBlob blobName={}", blobName);
         blobStore.executor().execute(new Runnable() {
             @Override public void run() {
-                InputStream is;
+                Cassandra.Client client = null;
                 try {
-                    S3Object object = blobStore.client().getObject(blobStore.bucket(), buildKey(blobName));
-                    is = object.getObjectContent();
-                } catch (Exception e) {
-                    listener.onFailure(e);
-                    return;
+                    client = CassandraClientFactory.getCassandraClient();
+                    readBlob(client, blobName, listener);
                 }
-                byte[] buffer = new byte[blobStore.bufferSizeInBytes()];
-                try {
-                    int bytesRead;
-                    while ((bytesRead = is.read(buffer)) != -1) {
-                        listener.onPartial(buffer, 0, bytesRead);
+                catch (Exception ex) {
+                    listener.onFailure(ex);
+                }
+                finally {
+                    if (client != null) {
+                        CassandraClientFactory.closeCassandraClient(client);
                     }
-                    listener.onCompleted();
-                } catch (Exception e) {
-                    try {
-                        is.close();
-                    } catch (IOException e1) {
-                        // ignore
-                    }
-                    listener.onFailure(e);
                 }
             }
         });
-        */
+    }
+
+    private void readBlob(Cassandra.Client client, String blobName, ReadBlobListener listener)
+        throws Exception
+    {
+        ColumnOrSuperColumn columnOrSuperColumn = client.get(
+            keySpace,
+            blobPath + '/' + blobName,
+            new ColumnPath("Blobs").setColumn(utf8.encode("data")),
+            ConsistencyLevel.QUORUM);
+        Column column = columnOrSuperColumn.getColumn();
+        byte[] blobData = column.getValue();
+        logger.debug("Read {} ({} bytes): {}",
+            blobName, blobData.length, new String(blobData));
+        listener.onPartial(blobData, 0, blobData.length);
+        listener.onCompleted();
     }
 
     @Override public ImmutableMap<String, BlobMetaData> listBlobsByPrefix(@Nullable String blobNamePrefix) throws IOException {
