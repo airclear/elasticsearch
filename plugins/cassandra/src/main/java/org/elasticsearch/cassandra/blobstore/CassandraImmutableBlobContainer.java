@@ -111,7 +111,7 @@ public class CassandraImmutableBlobContainer extends AbstractCassandraBlobContai
             new HashMap<String, List<Mutation>>();
         blobsMutationMap.put("Blobs", blobsMutations);
 
-        mutationMap.put(blobPath + '/' + blobName, blobsMutationMap);
+        mutationMap.put(blobKey(blobName), blobsMutationMap);
 
         // Insert the blobName into BlobNames.
 

@@ -55,25 +55,36 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
 
     protected static final Charset utf8 = Charset.forName("UTF-8");
 
-    protected final ESLogger logger = Loggers.getLogger(getClass());
+    protected static final String keySpace = "ElasticSearch";
 
-    protected final CassandraBlobStore blobStore;
+    protected final ESLogger logger = Loggers.getLogger(getClass());
 
     protected final String blobPath;
 
-    protected static final String keySpace = "ElasticSearch";
+    protected final CassandraBlobStore blobStore;
 
     public AbstractCassandraBlobContainer(BlobPath path, CassandraBlobStore blobStore) {
         super(path);
-        this.blobStore = blobStore;
         this.blobPath = path.buildAsString("/");
+        this.blobStore = blobStore;
         logger.debug("AbstractCassandraBlobContainer path={}", path);
     }
 
     @Override public boolean blobExists(String blobName) {
         try {
             logger.debug("TODO blobExists blobName={}", blobName);
-            return true;
+            Cassandra.Client client =
+                CassandraClientFactory.getCassandraClient();
+            try {
+                return client.get_count(
+                    keySpace,
+                    blobKey(blobName),
+                    new ColumnParent("Blobs"),
+                    ConsistencyLevel.QUORUM) != 0;
+            }
+            finally {
+                CassandraClientFactory.closeCassandraClient(client);
+            }
         } catch (Exception e) {
             return false;
         }
@@ -110,7 +121,7 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
     {
         ColumnOrSuperColumn columnOrSuperColumn = client.get(
             keySpace,
-            blobPath + '/' + blobName,
+            blobKey(blobName),
             new ColumnPath("Blobs").setColumn(utf8.encode("data")),
             ConsistencyLevel.QUORUM);
         Column column = columnOrSuperColumn.getColumn();
@@ -172,5 +183,9 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
 
     @Override public ImmutableMap<String, BlobMetaData> listBlobs() throws IOException {
         return listBlobsByPrefix(null);
+    }
+
+    protected String blobKey(String blobName) {
+        return blobPath + '/' + blobName;
     }
 }
