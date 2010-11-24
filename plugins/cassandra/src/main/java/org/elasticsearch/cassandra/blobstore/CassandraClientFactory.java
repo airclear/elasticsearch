@@ -21,7 +21,6 @@ package org.elasticsearch.cassandra.blobstore;
 
 import java.io.IOException;
 
-import org.apache.thrift.TException;
 import org.apache.thrift.protocol.TBinaryProtocol;
 import org.apache.thrift.protocol.TProtocol;
 import org.apache.thrift.transport.TFramedTransport;
