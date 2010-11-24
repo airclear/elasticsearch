@@ -183,17 +183,16 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
         List<ColumnOrSuperColumn> columns;
         Cassandra.Client client = CassandraClientFactory.getCassandraClient();
         try {
-            columns =
-                client.get_slice(
-                    keySpace,
-                    blobPath,
-                    new ColumnParent("BlobNames"),
-                    new SlicePredicate().setSlice_range(
-                        new SliceRange()
-                        .setStart(new byte[0])
-                        .setFinish(new byte[0])
-                        .setCount(1000000000)),
-                    ConsistencyLevel.QUORUM);
+            columns = client.get_slice(
+                keySpace,
+                blobPath,
+                new ColumnParent("BlobNames"),
+                new SlicePredicate().setSlice_range(
+                    new SliceRange()
+                    .setStart(new byte[0])
+                    .setFinish(new byte[0])
+                    .setCount(1000000000)),
+                ConsistencyLevel.QUORUM);
         }
         catch (InvalidRequestException ex) {
             throw new IOException("Cassandra get_slice on ???:??? failed", ex);
