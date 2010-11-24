@@ -46,7 +46,7 @@ import static org.elasticsearch.action.Actions.*;
  */
 public class BulkRequest implements ActionRequest {
 
-    final List<ActionRequest> requests = Lists.newArrayList();
+    final public List<ActionRequest> requests = Lists.newArrayList();
 
     private boolean listenerThreaded = false;
 

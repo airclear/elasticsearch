@@ -141,7 +141,7 @@ public final class InternalNode implements Node {
         modules.add(new TransportActionModule());
         modules.add(new MonitorModule(settings));
         modules.add(new GatewayModule(settings));
-        modules.add(new NodeClientModule());
+        modules.add(new NodeClientModule(settings));
 
         injector = modules.createInjector();
 
