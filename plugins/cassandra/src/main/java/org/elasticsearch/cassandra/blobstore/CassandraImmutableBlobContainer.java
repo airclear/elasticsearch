@@ -61,7 +61,7 @@ public class CassandraImmutableBlobContainer extends AbstractCassandraBlobContai
         blobStore.executor().execute(new Runnable() {
             @Override public void run() {
                 try {
-                    logger.debug("writeBlob blobKey={}, sizeInBytes={}", blobKey(blobName), sizeInBytes);
+                    logger.debug("writeBlob {} sizeInBytes: {}", blobKey(blobName), sizeInBytes);
                     Cassandra.Client client =
                         CassandraClientFactory.getCassandraClient();
                     try {
