@@ -71,8 +71,8 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
     }
 
     @Override public boolean blobExists(String blobName) {
+        logger.debug("TODO blobExists blobName={}", blobName);
         try {
-            logger.debug("TODO blobExists blobName={}", blobName);
             Cassandra.Client client =
                 CassandraClientFactory.getCassandraClient();
             try {
@@ -92,7 +92,26 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
 
     @Override public boolean deleteBlob(String blobName) throws IOException {
         logger.debug("TODO deleteBlob blobName={}", blobName);
-        return true;
+        Cassandra.Client client =
+            CassandraClientFactory.getCassandraClient();
+        try {
+            long timestamp = System.currentTimeMillis();
+            client.remove(
+                keySpace,
+                blobKey(blobName),
+                new ColumnPath("Blobs"),
+                timestamp,
+                ConsistencyLevel.QUORUM);
+            return true;
+        }
+        catch (Exception e) {
+            // TODO S3 does this, what's the deal with returning false
+            // vs. throwing IOException?
+            return false;
+        }
+        finally {
+            CassandraClientFactory.closeCassandraClient(client);
+        }
     }
 
     @Override public void readBlob(final String blobName, final ReadBlobListener listener) {
