@@ -91,7 +91,7 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
     }
 
     @Override public boolean deleteBlob(String blobName) throws IOException {
-        logger.debug("TODO deleteBlob blobName={}", blobName);
+        logger.debug("deleteBlob blobName={}", blobName);
         Cassandra.Client client =
             CassandraClientFactory.getCassandraClient();
         try {
@@ -145,8 +145,7 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
             ConsistencyLevel.QUORUM);
         Column column = columnOrSuperColumn.getColumn();
         byte[] blobData = column.getValue();
-        logger.debug("Read {} ({} bytes): {}",
-            blobName, blobData.length, new String(blobData));
+        logger.debug("Read {}, {} bytes", blobName, blobData.length);
         listener.onPartial(blobData, 0, blobData.length);
         listener.onCompleted();
     }
