@@ -75,7 +75,7 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
     }
 
     @Override public boolean blobExists(String blobName) {
-        logger.debug("TODO blobExists blobKey={}", blobKey(blobName));
+        logger.debug("TODO blobExists {}", blobKey(blobName));
         try {
             Cassandra.Client client =
                 CassandraClientFactory.getCassandraClient();
@@ -95,7 +95,7 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
     }
 
     @Override public boolean deleteBlob(String blobName) throws IOException {
-        logger.debug("deleteBlob blobKey={}", blobKey(blobName));
+        logger.debug("deleteBlob {}", blobKey(blobName));
         Cassandra.Client client =
             CassandraClientFactory.getCassandraClient();
         try {
@@ -142,7 +142,7 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
     }
 
     @Override public void readBlob(final String blobName, final ReadBlobListener listener) {
-        logger.debug("readBlob blobKey={}", blobKey(blobName));
+        logger.debug("readBlob {}", blobKey(blobName));
         blobStore.executor().execute(new Runnable() {
             @Override public void run() {
                 Cassandra.Client client = null;
@@ -172,13 +172,13 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
             ConsistencyLevel.QUORUM);
         Column column = columnOrSuperColumn.getColumn();
         byte[] blobData = column.getValue();
-        logger.debug("Read {}, {} bytes", blobKey(blobName), blobData.length);
+        logger.debug("Read {} bytes: {}", blobKey(blobName), blobData.length);
         listener.onPartial(blobData, 0, blobData.length);
         listener.onCompleted();
     }
 
     @Override public ImmutableMap<String, BlobMetaData> listBlobsByPrefix(@Nullable String blobNamePrefix) throws IOException {
-        logger.debug("listBlobsByPrefix blobNamePrefix={}", blobKey(blobNamePrefix));
+        logger.debug("listBlobsByPrefix {}", blobKey(blobNamePrefix));
 
         List<ColumnOrSuperColumn> columns;
         Cassandra.Client client = CassandraClientFactory.getCassandraClient();
@@ -216,7 +216,7 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
             Column column = columnOrSuperColumn.getColumn();
             String name = new String(column.getName(), utf8);
             long length = Integer.parseInt(new String(column.getValue(), utf8));
-            logger.debug("name: {}, length: {}", name, length);
+            logger.debug("name: {} length: {}", name, length);
             if (blobNamePrefix == null || name.startsWith(blobNamePrefix)) {
                 blobsBuilder.put(name, new PlainBlobMetaData(name, length));
             }

@@ -51,7 +51,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
 
         this.bufferSizeInBytes = (int) settings.getAsBytesSize("buffer_size", new ByteSizeValue(100, ByteSizeUnit.KB)).bytes();
 
-        logger.debug("CassandraBlobStore executor={}, bufferSizeInBytes={}", executor, bufferSizeInBytes);
+        logger.debug("CassandraBlobStore executor: {} bufferSizeInBytes: {}", executor, bufferSizeInBytes);
     }
 
     @Override public String toString() {
@@ -73,7 +73,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
     }
 
     @Override public void delete(BlobPath path) {
-        logger.debug("TODO delete path={}", path);
+        logger.debug("TODO delete {}", path);
         /* XXX TODO
         ObjectListing prevListing = null;
         while (true) {
