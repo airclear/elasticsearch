@@ -45,7 +45,6 @@ import org.apache.thrift.TException;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
-import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
