@@ -67,6 +67,9 @@ import org.elasticsearch.common.blobstore.BlobStore;
 import org.elasticsearch.common.blobstore.ImmutableBlobContainer;
 import org.elasticsearch.common.blobstore.support.PlainBlobMetaData;
 import org.elasticsearch.common.collect.ImmutableMap;
+import org.elasticsearch.common.collect.ImmutableList;
+import org.elasticsearch.common.collect.Lists;
+import org.elasticsearch.common.collect.Maps;
 import org.elasticsearch.common.component.AbstractComponent;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
@@ -192,21 +195,19 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         long timestamp = System.currentTimeMillis();
 
         Map<String, Map<String, List<Mutation>>> mutationMap =
-            new HashMap<String, Map<String, List<Mutation>>>();
+            Maps.newHashMap();
 
-        List<Mutation> blobNamesMutations = new ArrayList<Mutation>();
+        List<Mutation> blobNamesMutations = Lists.newArrayList();
 
         for (String blobName : blobNames) {
             String blobKey = blobKey(blobPath, blobName);
 
             // Delete the blob data from Blobs.
 
-            List<Mutation> blobsMutations = new ArrayList<Mutation>(1);
-            blobsMutations.add(createDelete(null, timestamp));
-
-            Map<String, List<Mutation>> blobsMutationMap =
-                new HashMap<String, List<Mutation>>();
-            blobsMutationMap.put("Blobs", blobsMutations);
+            Map<String, List<Mutation>> blobsMutationMap = Maps.newHashMap();
+            blobsMutationMap.put(
+                "Blobs", 
+                ImmutableList.of(createDelete(null, timestamp)));
 
             mutationMap.put(blobKey, blobsMutationMap);
 
@@ -216,8 +217,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         }
 
         Map<String, List<Mutation>> blobNamesMutationMap =
-            new HashMap<String, List<Mutation>>();
-        blobNamesMutationMap.put("BlobNames", blobNamesMutations);
+            ImmutableMap.of("BlobNames", blobNamesMutations);
 
         mutationMap.put(blobPath, blobNamesMutationMap);
 
@@ -243,10 +243,9 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
     private Mutation createDelete(String name, long timestamp) {
         Deletion deletion = new Deletion(timestamp);
         if (name != null) {
-            List<ByteBuffer> columnNames = new ArrayList<ByteBuffer>(1);
-            columnNames.add(utf8.encode(name));
             deletion.setPredicate(
-                new SlicePredicate().setColumn_names(columnNames));
+                new SlicePredicate().setColumn_names(
+                    ImmutableList.of(utf8.encode(name))));
         }
         return new Mutation().setDeletion(deletion);
     }
@@ -369,7 +368,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         long timestamp = System.currentTimeMillis();
 
         Map<String, Map<String, List<Mutation>>> mutationMap =
-            new HashMap<String, Map<String, List<Mutation>>>();
+            Maps.newHashMap();
 
         // Insert the blob data into Blobs.
 
@@ -382,12 +381,10 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         ByteBuffer blobData = ByteBuffer.allocate(intSizeInBytes);
         new DataInputStream(is).readFully(blobData.array());
 
-        List<Mutation> blobsMutations = new ArrayList<Mutation>();
-        blobsMutations.add(createInsert("data", blobData, timestamp));
-
-        Map<String, List<Mutation>> blobsMutationMap =
-            new HashMap<String, List<Mutation>>();
-        blobsMutationMap.put("Blobs", blobsMutations);
+        Map<String, List<Mutation>> blobsMutationMap = Maps.newHashMap();
+        blobsMutationMap.put(
+            "Blobs",
+            ImmutableList.of(createInsert("data", blobData, timestamp)));
 
         mutationMap.put(blobKey, blobsMutationMap);
 
@@ -395,12 +392,11 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
 
         ByteBuffer size = utf8.encode(Long.toString(sizeInBytes));
 
-        List<Mutation> blobNamesMutations = new ArrayList<Mutation>();
-        blobNamesMutations.add(createInsert(blobName, size, timestamp));
-
         Map<String, List<Mutation>> blobNamesMutationMap =
-            new HashMap<String, List<Mutation>>();
-        blobNamesMutationMap.put("BlobNames", blobNamesMutations);
+            Maps.newHashMap();
+        blobNamesMutationMap.put(
+            "BlobNames",
+            ImmutableList.of(createInsert(blobName, size, timestamp)));
 
         mutationMap.put(blobPath, blobNamesMutationMap);
 
