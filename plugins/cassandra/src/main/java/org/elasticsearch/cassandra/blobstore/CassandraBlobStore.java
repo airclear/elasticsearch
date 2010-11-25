@@ -17,6 +17,47 @@
  * under the License.
  */
 
+/**
+ * The cassandra column families are defined in storage-conf.xml like
+ * this:
+ *    <!-- Key is BlobPath/BlobName.
+ *         Column name is "data".
+ *         Value is blob data. -->
+ *    <ColumnFamily Name="Blobs"/>
+ *                  />
+ *    <!-- Key is BlobPath.
+ *         Column names are BlobNames.
+ *         Value is size as a string. -->
+ *    <ColumnFamily Name="BlobNames"/>
+ *
+ * ElasticSearch needs us to support the following:
+ * 1. Read, write, and delete a blob named by BlobPath + BlobName.
+ * 2. Determine whether a Blob exists.  (Actually this method, blobExists,
+ *    is not referenced in the code.)
+ * 3. Get a list of BlobNames in a BlobPath, with their sizes.
+ * 4. Delete all blobs in a BlobPath.
+ *
+ * Here are a couple ways to store the data, and why they don't work:
+ * A. A single column family with BlobPath as the key and BlobName as the
+ *    column name.  1 and 4 are easy, but getting the sizes for 3 isn't
+ *    possible without fetching the entire blob.  Same with 2.
+ * B. A single supercolumn family with BlobPath as a key and BlobName as
+ *    the supercolumn name, with subcolumns data and size.  1, 2, and 4
+ *    are easy, but fetching the size for 3 requires fetching the entire
+ *    supercolumn, we can't just pick out the size column in a get_slice
+ *    request.
+ *
+ * The storage layout used allows us to do everything we need even though
+ * it's a bit more complicated than A and B because it has two column
+ * families.
+ * X. Storing the blob names and sizes in BlobNames makes 3 possible,
+ *    but complicates 1 since we need to track things in BlobNames.
+ * Y. Using BlobPath/BlobName as the key and storing the data in a column
+ *    makes 2 possible using get_count.
+ * Z. But it complicates 4, which must be done by fetching the BlobPath's
+ *    BlobNames then deleting them.
+ */
+
 package org.elasticsearch.cassandra.blobstore;
 
 import org.elasticsearch.common.blobstore.BlobContainer;
@@ -101,26 +142,19 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
     }
 
     @Override public void delete(BlobPath path) {
-        logger.debug("TODO delete {}", path);
-        /* XXX TODO
-        ObjectListing prevListing = null;
-        while (true) {
-            ObjectListing list;
-            if (prevListing != null) {
-                list = client.listNextBatchOfObjects(prevListing);
-            } else {
-                list = client.listObjects(bucket, path.buildAsString("/"));
-            }
-            for (S3ObjectSummary summary : list.getObjectSummaries()) {
-                client.deleteObject(summary.getBucketName(), summary.getKey());
-            }
-            if (list.isTruncated()) {
-                prevListing = list;
-            } else {
-                break;
-            }
+        String blobPath = path.buildAsString("/");
+        logger.debug("TODO delete {}", blobPath);
+        try {
+            ImmutableMap<String, BlobMetaData> blobs =
+                listBlobsByPrefix(blobPath, null);
+            String[] blobNames =
+                blobs.keySet().toArray(new String[blobs.size()]);
+            deleteBlobs(blobPath, blobNames);
         }
-        */
+        catch (IOException ex) {
+            // Oh well, nothing we can do but log.
+            logger.warn("delete {} failed", ex, blobPath);
+        }
     }
 
     @Override public void close() {
@@ -148,19 +182,26 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
     }
 
     boolean deleteBlob(String blobPath, String blobName) throws IOException {
-        String blobKey = blobKey(blobPath, blobName);
-        logger.debug("deleteBlob {}", blobKey);
-        Cassandra.Client client =
-            CassandraClientFactory.getCassandraClient();
-        try {
-            long timestamp = System.currentTimeMillis();
+        logger.debug("deleteBlob {}", blobKey(blobPath, blobName));
+        return deleteBlobs(blobPath, blobName);
+    }
 
-            Map<String, Map<String, List<Mutation>>> mutationMap =
-                new HashMap<String, Map<String, List<Mutation>>>();
+    private boolean deleteBlobs(String blobPath, String... blobNames)
+        throws IOException
+    {
+        long timestamp = System.currentTimeMillis();
 
-           // Delete the blob data from Blobs.
+        Map<String, Map<String, List<Mutation>>> mutationMap =
+            new HashMap<String, Map<String, List<Mutation>>>();
 
-            List<Mutation> blobsMutations = new ArrayList<Mutation>();
+        List<Mutation> blobNamesMutations = new ArrayList<Mutation>();
+
+        for (String blobName : blobNames) {
+            String blobKey = blobKey(blobPath, blobName);
+
+            // Delete the blob data from Blobs.
+
+            List<Mutation> blobsMutations = new ArrayList<Mutation>(1);
             blobsMutations.add(createDelete(null, timestamp));
 
             Map<String, List<Mutation>> blobsMutationMap =
@@ -171,18 +212,20 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
 
             // Delete the blobName from BlobNames.
 
-            List<Mutation> blobNamesMutations = new ArrayList<Mutation>();
             blobNamesMutations.add(createDelete(blobName, timestamp));
+        }
 
-            Map<String, List<Mutation>> blobNamesMutationMap =
-                new HashMap<String, List<Mutation>>();
-            blobNamesMutationMap.put("BlobNames", blobNamesMutations);
+        Map<String, List<Mutation>> blobNamesMutationMap =
+            new HashMap<String, List<Mutation>>();
+        blobNamesMutationMap.put("BlobNames", blobNamesMutations);
 
-            mutationMap.put(blobPath, blobNamesMutationMap);
+        mutationMap.put(blobPath, blobNamesMutationMap);
 
+        Cassandra.Client client = null;
+        try {
+            client = CassandraClientFactory.getCassandraClient();
             client.batch_mutate(
                 keySpace, mutationMap, ConsistencyLevel.QUORUM);
-
             return true;
         }
         catch (Exception e) {
@@ -191,7 +234,9 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
             return false;
         }
         finally {
-            CassandraClientFactory.closeCassandraClient(client);
+            if (client != null) {
+                CassandraClientFactory.closeCassandraClient(client);
+            }
         }
     }
 
