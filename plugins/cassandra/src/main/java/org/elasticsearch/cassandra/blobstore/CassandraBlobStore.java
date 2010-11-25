@@ -197,12 +197,10 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         Map<String, Map<String, List<Mutation>>> mutationMap =
             Maps.newHashMap();
 
-        List<Mutation> blobNamesMutations = Lists.newArrayList();
+        // Delete the blob data from Blobs.
 
         for (String blobName : blobNames) {
             String blobKey = blobKey(blobPath, blobName);
-
-            // Delete the blob data from Blobs.
 
             Map<String, List<Mutation>> blobsMutationMap = Maps.newHashMap();
             blobsMutationMap.put(
@@ -210,9 +208,12 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
                 ImmutableList.of(createDelete(null, timestamp)));
 
             mutationMap.put(blobKey, blobsMutationMap);
+        }
 
-            // Delete the blobName from BlobNames.
+        // Delete the blobNames from BlobNames.
 
+        List<Mutation> blobNamesMutations = Lists.newArrayList();
+        for (String blobName : blobNames) {
             blobNamesMutations.add(createDelete(blobName, timestamp));
         }
 
