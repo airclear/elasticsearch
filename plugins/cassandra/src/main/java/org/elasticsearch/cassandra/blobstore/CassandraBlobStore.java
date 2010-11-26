@@ -109,11 +109,11 @@ import java.util.concurrent.Executor;
  * @author Tom May (tom@gist.com)
  */
 public class CassandraBlobStore extends AbstractComponent implements BlobStore {
-    private static final String keySpace = "ElasticSearch";
-
     private static final Charset utf8 = Charset.forName("UTF-8");
 
     private final ESLogger logger = Loggers.getLogger(getClass());
+
+    private final String keyspace;
 
     private final CassandraClientFactory cassandraClientFactory;
 
@@ -124,6 +124,8 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
     // XXX executor is a java.util.concurrent.ThreadPoolExecutor
     public CassandraBlobStore(Settings settings, Executor executor) {
         super(settings);
+
+        keyspace = settings.get("keyspace", "ElasticSearch");
 
         String host = settings.get("host", "localhost");
         int port = settings.getAsInt("port", 9160);
@@ -178,7 +180,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
                 cassandraClientFactory.getCassandraClient();
             try {
                 return client.get_count(
-                    keySpace,
+                    keyspace,
                     blobKey,
                     new ColumnParent("Blobs"),
                     ConsistencyLevel.QUORUM) != 0;
@@ -233,7 +235,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         try {
             client = cassandraClientFactory.getCassandraClient();
             client.batch_mutate(
-                keySpace, mutationMap, ConsistencyLevel.QUORUM);
+                keyspace, mutationMap, ConsistencyLevel.QUORUM);
             return true;
         }
         catch (Exception e) {
@@ -284,7 +286,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         throws Exception
     {
         ColumnOrSuperColumn columnOrSuperColumn = client.get(
-            keySpace,
+            keyspace,
             blobKey,
             new ColumnPath("Blobs").setColumn(utf8.encode("data")),
             ConsistencyLevel.QUORUM);
@@ -301,7 +303,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         Cassandra.Client client = cassandraClientFactory.getCassandraClient();
         try {
             columns = client.get_slice(
-                keySpace,
+                keyspace,
                 blobPath,
                 new ColumnParent("BlobNames"),
                 new SlicePredicate().setSlice_range(
@@ -409,7 +411,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         mutationMap.put(blobPath, blobNamesMutationMap);
 
         client.batch_mutate(
-            keySpace, mutationMap, ConsistencyLevel.QUORUM);
+            keyspace, mutationMap, ConsistencyLevel.QUORUM);
     }
 
     private Mutation createInsert(String name, ByteBuffer value, long timestamp) {

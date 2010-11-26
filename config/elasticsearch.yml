@@ -3,6 +3,7 @@ gateway:
   cassandra:
     host: localhost
     port: 9160
+    keyspace: ElasticSearch
 
 index:
   numberOfShards: 1
