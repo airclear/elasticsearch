@@ -43,7 +43,8 @@ public class AbstractCassandraBlobContainer extends AbstractBlobContainer {
         super(path);
         this.blobPath = path.buildAsString("/");
         this.blobStore = blobStore;
-        logger.debug("AbstractCassandraBlobContainer path={}", path);
+        logger.debug("AbstractCassandraBlobContainer blobStore={} path={}",
+            blobStore, path);
     }
 
     @Override public boolean blobExists(String blobName) {

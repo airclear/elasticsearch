@@ -31,11 +31,19 @@ import org.apache.thrift.transport.TTransportException;
 import org.apache.cassandra.thrift.Cassandra;
 
 class CassandraClientFactory {
-    public static Cassandra.Client getCassandraClient()
+    private final String host;
+    private final int port;
+
+    public CassandraClientFactory(String host, int port) {
+        this.host = host;
+        this.port = port;
+    }
+
+    public Cassandra.Client getCassandraClient()
         throws IOException
     {
         TTransport transport =
-            new TFramedTransport(new TSocket("localhost", 9160));
+            new TFramedTransport(new TSocket(host, port));
         TProtocol protocol = new TBinaryProtocol(transport);
         Cassandra.Client client = new Cassandra.Client(protocol);
         try {
@@ -43,12 +51,13 @@ class CassandraClientFactory {
         }
         catch (TTransportException ex) {
             throw new IOException(
-                "Cassandra transport.open to localhost:9160 failed", ex);
+                "Cassandra transport.open to " + host + ":" + port + " failed",
+                ex);
         }
         return client;
     }
 
-    public static void closeCassandraClient(Cassandra.Client client) {
+    public void closeCassandraClient(Cassandra.Client client) {
         client.getInputProtocol().getTransport().close();
     }
 }

@@ -5,6 +5,10 @@ client:
 # make sure we store these somewhere as the LruClient closes them locally
 gateway:
   type: cassandra
+  cassandra:
+    host: localhost
+    port: 9160
+    keyspace: ElasticSearch
 
 index:
   numberOfShards: 1
