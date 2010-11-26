@@ -33,6 +33,8 @@ public class CassandraImmutableBlobContainer extends AbstractCassandraBlobContai
 
     public CassandraImmutableBlobContainer(BlobPath path, CassandraBlobStore blobStore) {
         super(path, blobStore);
+        logger.debug("CassandraImmutableBlobContainer blobStore={} path={}",
+            blobStore, path);
     }
 
     @Override public void writeBlob(String blobName, InputStream is, long sizeInBytes, WriterListener listener) {

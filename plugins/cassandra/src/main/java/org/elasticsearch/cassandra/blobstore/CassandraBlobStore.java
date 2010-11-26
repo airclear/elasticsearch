@@ -115,6 +115,8 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
 
     private final String keyspace;
 
+    private final String hostAndPort;
+
     private final CassandraClientFactory cassandraClientFactory;
 
     private final Executor executor;
@@ -129,18 +131,19 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
 
         String host = settings.get("host", "localhost");
         int port = settings.getAsInt("port", 9160);
+        hostAndPort = host + ':' + port;
         cassandraClientFactory = new CassandraClientFactory(host, port);
 
         this.executor = executor;
 
         this.bufferSizeInBytes = (int) settings.getAsBytesSize("buffer_size", new ByteSizeValue(100, ByteSizeUnit.KB)).bytes();
 
-        logger.debug("CassandraBlobStore {}:{} executor: {} bufferSizeInBytes: {}",
-            host, port, executor, bufferSizeInBytes);
+        logger.debug("CassandraBlobStore {} executor: {} bufferSizeInBytes: {}",
+            this, executor, bufferSizeInBytes);
     }
 
     @Override public String toString() {
-        return "cassandra"; // XXX
+        return hostAndPort;
     }
 
     /* XXX
@@ -165,7 +168,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         }
         catch (IOException ex) {
             // Oh well, nothing we can do but log.
-            logger.warn("delete {} failed", ex, blobPath);
+            logger.warn("delete {} failed on {}", ex, blobPath, this);
         }
     }
 
@@ -314,16 +317,16 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
                 ConsistencyLevel.QUORUM);
         }
         catch (InvalidRequestException ex) {
-            throw new IOException("Cassandra get_slice on ???:??? failed", ex);
+            throw new IOException("Cassandra get_slice failed on " + this, ex);
         }
         catch (UnavailableException ex) {
-            throw new IOException("Cassandra get_slice on ???:??? failed", ex);
+            throw new IOException("Cassandra get_slice failed on " + this, ex);
         }
         catch (TimedOutException ex) {
-            throw new IOException("Cassandra get_slice on ???:??? failed", ex);
+            throw new IOException("Cassandra get_slice failed on " + this, ex);
         }
         catch (TException ex) {
-            throw new IOException("Cassandra get_slice on ???:??? failed", ex);
+            throw new IOException("Cassandra get_slice failed on " + this, ex);
         }
         finally {
             cassandraClientFactory.closeCassandraClient(client);
