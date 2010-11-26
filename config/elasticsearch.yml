@@ -1,5 +1,8 @@
 gateway:
   type: cassandra
+  cassandra:
+    host: localhost
+    port: 9160
 
 index:
   numberOfShards: 1

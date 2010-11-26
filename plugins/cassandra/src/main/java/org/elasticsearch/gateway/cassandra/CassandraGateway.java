@@ -49,7 +49,7 @@ public class CassandraGateway extends BlobStoreGateway {
 
         logger.debug("using chunk_size [{}]", chunkSize);
 
-        initialize(new CassandraBlobStore(settings, threadPool.cached()), clusterName, chunkSize);
+        initialize(new CassandraBlobStore(componentSettings, threadPool.cached()), clusterName, chunkSize);
     }
 
     @Override public void close() throws ElasticSearchException {

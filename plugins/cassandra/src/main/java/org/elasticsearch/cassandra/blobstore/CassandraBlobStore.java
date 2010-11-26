@@ -115,6 +115,8 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
 
     private final ESLogger logger = Loggers.getLogger(getClass());
 
+    private final CassandraClientFactory cassandraClientFactory;
+
     private final Executor executor;
 
     private final int bufferSizeInBytes; // XXX
@@ -123,11 +125,16 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
     public CassandraBlobStore(Settings settings, Executor executor) {
         super(settings);
 
+        String host = settings.get("host", "localhost");
+        int port = settings.getAsInt("port", 9160);
+        cassandraClientFactory = new CassandraClientFactory(host, port);
+
         this.executor = executor;
 
         this.bufferSizeInBytes = (int) settings.getAsBytesSize("buffer_size", new ByteSizeValue(100, ByteSizeUnit.KB)).bytes();
 
-        logger.debug("CassandraBlobStore executor: {} bufferSizeInBytes: {}", executor, bufferSizeInBytes);
+        logger.debug("CassandraBlobStore {}:{} executor: {} bufferSizeInBytes: {}",
+            host, port, executor, bufferSizeInBytes);
     }
 
     @Override public String toString() {
@@ -168,7 +175,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         logger.debug("TODO blobExists {}", blobKey);
         try {
             Cassandra.Client client =
-                CassandraClientFactory.getCassandraClient();
+                cassandraClientFactory.getCassandraClient();
             try {
                 return client.get_count(
                     keySpace,
@@ -177,7 +184,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
                     ConsistencyLevel.QUORUM) != 0;
             }
             finally {
-                CassandraClientFactory.closeCassandraClient(client);
+                cassandraClientFactory.closeCassandraClient(client);
             }
         } catch (Exception e) {
             return false;
@@ -224,7 +231,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
 
         Cassandra.Client client = null;
         try {
-            client = CassandraClientFactory.getCassandraClient();
+            client = cassandraClientFactory.getCassandraClient();
             client.batch_mutate(
                 keySpace, mutationMap, ConsistencyLevel.QUORUM);
             return true;
@@ -236,7 +243,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         }
         finally {
             if (client != null) {
-                CassandraClientFactory.closeCassandraClient(client);
+                cassandraClientFactory.closeCassandraClient(client);
             }
         }
     }
@@ -258,7 +265,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
             @Override public void run() {
                 Cassandra.Client client = null;
                 try {
-                    client = CassandraClientFactory.getCassandraClient();
+                    client = cassandraClientFactory.getCassandraClient();
                     readBlob(client, blobKey, listener);
                 }
                 catch (Exception ex) {
@@ -266,7 +273,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
                 }
                 finally {
                     if (client != null) {
-                        CassandraClientFactory.closeCassandraClient(client);
+                        cassandraClientFactory.closeCassandraClient(client);
                     }
                 }
             }
@@ -291,7 +298,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
     ImmutableMap<String, BlobMetaData> listBlobsByPrefix(String blobPath, @Nullable String blobNamePrefix) throws IOException {
         logger.debug("listBlobsByPrefix {}", blobKey(blobPath, blobNamePrefix));
         List<ColumnOrSuperColumn> columns;
-        Cassandra.Client client = CassandraClientFactory.getCassandraClient();
+        Cassandra.Client client = cassandraClientFactory.getCassandraClient();
         try {
             columns = client.get_slice(
                 keySpace,
@@ -317,7 +324,7 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
             throw new IOException("Cassandra get_slice on ???:??? failed", ex);
         }
         finally {
-            CassandraClientFactory.closeCassandraClient(client);
+            cassandraClientFactory.closeCassandraClient(client);
         }
 
         ImmutableMap.Builder<String, BlobMetaData> blobsBuilder = ImmutableMap.builder();
@@ -341,13 +348,13 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
             @Override public void run() {
                 try {
                     Cassandra.Client client =
-                        CassandraClientFactory.getCassandraClient();
+                        cassandraClientFactory.getCassandraClient();
                     try {
                         writeBlob(client, blobPath, blobName, is, sizeInBytes);
                         listener.onCompleted();
                     }
                     finally {
-                        CassandraClientFactory.closeCassandraClient(client);
+                        cassandraClientFactory.closeCassandraClient(client);
                     }
                 } catch (Exception e) {
                     listener.onFailure(e);
