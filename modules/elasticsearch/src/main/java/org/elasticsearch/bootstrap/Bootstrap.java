@@ -25,7 +25,9 @@ import org.elasticsearch.common.Classes;
 import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.inject.CreationException;
 import org.elasticsearch.common.inject.spi.Message;
+import org.elasticsearch.common.io.FileSystemUtils;
 import org.elasticsearch.common.jline.ANSI;
+import org.elasticsearch.common.jna.Natives;
 import org.elasticsearch.common.logging.ESLogger;
 import org.elasticsearch.common.logging.Loggers;
 import org.elasticsearch.common.logging.log4j.LogConfigurator;
@@ -57,6 +59,10 @@ public class Bootstrap {
     private static volatile CountDownLatch keepAliveLatch;
 
     private void setup(boolean addShutdownHook, Tuple<Settings, Environment> tuple) throws Exception {
+//        Loggers.getLogger(Bootstrap.class, tuple.v1().get("name")).info("heap_size {}/{}", JvmStats.jvmStats().mem().heapCommitted(), JvmInfo.jvmInfo().mem().heapMax());
+        if (tuple.v1().getAsBoolean("bootstrap.mlockall", true)) {
+            Natives.tryMlockall();
+        }
         tuple = setupJmx(tuple);
 
         NodeBuilder nodeBuilder = NodeBuilder.nodeBuilder().settings(tuple.v1()).loadConfigSettings(false);
@@ -150,6 +156,11 @@ public class Bootstrap {
             System.err.println(errorMessage);
             System.err.flush();
             System.exit(3);
+        }
+
+        if (System.getProperty("es.max-open-files", "false").equals("true")) {
+            ESLogger logger = Loggers.getLogger(Bootstrap.class);
+            logger.info("max_open_files [{}]", FileSystemUtils.maxOpenFiles(new File(tuple.v2().workFile(), "open_files")));
         }
 
         String stage = "Initialization";

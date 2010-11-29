@@ -28,7 +28,9 @@ import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.inject.Injector;
 import org.elasticsearch.common.inject.Injectors;
 import org.elasticsearch.common.inject.ModulesBuilder;
+import org.elasticsearch.common.io.FileSystemUtils;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.env.NodeEnvironment;
 import org.elasticsearch.gateway.none.NoneGateway;
 import org.elasticsearch.index.*;
 import org.elasticsearch.index.cache.IndexCache;
@@ -79,6 +81,8 @@ public class InternalIndexService extends AbstractIndexComponent implements Inde
 
     private final Settings indexSettings;
 
+    private final NodeEnvironment nodeEnv;
+
     private final ThreadPool threadPool;
 
     private final PluginsService pluginsService;
@@ -105,11 +109,12 @@ public class InternalIndexService extends AbstractIndexComponent implements Inde
 
     private final CleanCacheOnIndicesLifecycleListener cleanCacheOnIndicesLifecycleListener = new CleanCacheOnIndicesLifecycleListener();
 
-    @Inject public InternalIndexService(Injector injector, Index index, @IndexSettings Settings indexSettings, ThreadPool threadPool,
+    @Inject public InternalIndexService(Injector injector, Index index, @IndexSettings Settings indexSettings, NodeEnvironment nodeEnv, ThreadPool threadPool,
                                         MapperService mapperService, IndexQueryParserService queryParserService, SimilarityService similarityService,
                                         IndexCache indexCache, IndexEngine indexEngine, IndexGateway indexGateway, IndexStore indexStore) {
         super(index, indexSettings);
         this.injector = injector;
+        this.nodeEnv = nodeEnv;
         this.threadPool = threadPool;
         this.indexSettings = indexSettings;
         this.mapperService = mapperService;
@@ -182,7 +187,7 @@ public class InternalIndexService extends AbstractIndexComponent implements Inde
         return similarityService;
     }
 
-    @Override public IndexEngine indexEngine() {
+    @Override public IndexEngine engine() {
         return indexEngine;
     }
 
@@ -261,6 +266,10 @@ public class InternalIndexService extends AbstractIndexComponent implements Inde
 
     @Override public synchronized void cleanShard(int shardId) throws ElasticSearchException {
         deleteShard(shardId, true, false, false);
+    }
+
+    @Override public synchronized void removeShard(int shardId) throws ElasticSearchException {
+        deleteShard(shardId, false, false, false);
     }
 
     private void deleteShard(int shardId, boolean delete, boolean snapshotGateway, boolean deleteGateway) throws ElasticSearchException {
@@ -360,6 +369,11 @@ public class InternalIndexService extends AbstractIndexComponent implements Inde
         }
 
         Injectors.close(injector);
+
+        // delete the shard location if needed
+        if (delete || indexGateway.type().equals(NoneGateway.TYPE)) {
+            FileSystemUtils.deleteRecursively(nodeEnv.shardLocation(sId));
+        }
     }
 
     class CleanCacheOnIndicesLifecycleListener extends IndicesLifecycle.Listener {

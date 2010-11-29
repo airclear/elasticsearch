@@ -26,6 +26,7 @@ import org.elasticsearch.common.collect.Maps;
 import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
+import org.elasticsearch.common.unit.ByteSizeValue;
 import org.elasticsearch.common.xcontent.XContentFactory;
 import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.common.xcontent.XContentParser;
@@ -36,6 +37,7 @@ import org.elasticsearch.index.mapper.DocumentMapperParser;
 import org.elasticsearch.index.mapper.MapperParsingException;
 import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.mapper.xcontent.geo.GeoPointFieldMapper;
+import org.elasticsearch.index.mapper.xcontent.ip.IpFieldMapper;
 import org.elasticsearch.index.settings.IndexSettings;
 
 import javax.annotation.Nullable;
@@ -51,7 +53,7 @@ import static org.elasticsearch.index.mapper.xcontent.XContentTypeParsers.*;
  */
 public class XContentDocumentMapperParser extends AbstractIndexComponent implements DocumentMapperParser {
 
-    private final AnalysisService analysisService;
+    final AnalysisService analysisService;
 
     private final RootObjectMapper.TypeParser rootObjectTypeParser = new RootObjectMapper.TypeParser();
 
@@ -144,10 +146,14 @@ public class XContentDocumentMapperParser extends AbstractIndexComponent impleme
                 docBuilder.typeField(parseTypeField((Map<String, Object>) fieldNode, parserContext));
             } else if (UidFieldMapper.CONTENT_TYPE.equals(fieldName) || "uidField".equals(fieldName)) {
                 docBuilder.uidField(parseUidField((Map<String, Object>) fieldNode, parserContext));
+            } else if (RoutingFieldMapper.CONTENT_TYPE.equals(fieldName)) {
+                docBuilder.routingField(parseRoutingField((Map<String, Object>) fieldNode, parserContext));
             } else if (BoostFieldMapper.CONTENT_TYPE.equals(fieldName) || "boostField".equals(fieldName)) {
                 docBuilder.boostField(parseBoostField((Map<String, Object>) fieldNode, parserContext));
             } else if (AllFieldMapper.CONTENT_TYPE.equals(fieldName) || "allField".equals(fieldName)) {
                 docBuilder.allField(parseAllField((Map<String, Object>) fieldNode, parserContext));
+            } else if (AnalyzerMapper.CONTENT_TYPE.equals(fieldName)) {
+                docBuilder.analyzerField(parseAnalyzerField((Map<String, Object>) fieldNode, parserContext));
             } else if ("index_analyzer".equals(fieldName)) {
                 docBuilder.indexAnalyzer(analysisService.analyzer(fieldNode.toString()));
             } else if ("search_analyzer".equals(fieldName)) {
@@ -166,10 +172,10 @@ public class XContentDocumentMapperParser extends AbstractIndexComponent impleme
         }
 
         ImmutableMap<String, Object> attributes = ImmutableMap.of();
-        if (mapping.containsKey("_attributes")) {
-            attributes = ImmutableMap.copyOf((Map<String, Object>) mapping.get("_attributes"));
+        if (mapping.containsKey("_meta")) {
+            attributes = ImmutableMap.copyOf((Map<String, Object>) mapping.get("_meta"));
         }
-        docBuilder.attributes(attributes);
+        docBuilder.meta(attributes);
 
         XContentDocumentMapper documentMapper = docBuilder.build(this);
         // update the source with the generated one
@@ -209,6 +215,33 @@ public class XContentDocumentMapperParser extends AbstractIndexComponent impleme
         return builder;
     }
 
+    private RoutingFieldMapper.Builder parseRoutingField(Map<String, Object> routingNode, XContentMapper.TypeParser.ParserContext parserContext) {
+        RoutingFieldMapper.Builder builder = routing();
+        parseField(builder, builder.name, routingNode, parserContext);
+        for (Map.Entry<String, Object> entry : routingNode.entrySet()) {
+            String fieldName = Strings.toUnderscoreCase(entry.getKey());
+            Object fieldNode = entry.getValue();
+            if (fieldName.equals("required")) {
+                builder.required(nodeBooleanValue(fieldNode));
+            } else if (fieldName.equals("path")) {
+                builder.path(fieldNode.toString());
+            }
+        }
+        return builder;
+    }
+
+    private AnalyzerMapper.Builder parseAnalyzerField(Map<String, Object> analyzerNode, XContentMapper.TypeParser.ParserContext parserContext) {
+        AnalyzerMapper.Builder builder = analyzer();
+        for (Map.Entry<String, Object> entry : analyzerNode.entrySet()) {
+            String fieldName = Strings.toUnderscoreCase(entry.getKey());
+            Object fieldNode = entry.getValue();
+            if (fieldName.equals("path")) {
+                builder.field(fieldNode.toString());
+            }
+        }
+        return builder;
+    }
+
     private AllFieldMapper.Builder parseAllField(Map<String, Object> allNode, XContentMapper.TypeParser.ParserContext parserContext) {
         AllFieldMapper.Builder builder = all();
         parseField(builder, builder.name, allNode, parserContext);
@@ -232,6 +265,14 @@ public class XContentDocumentMapperParser extends AbstractIndexComponent impleme
                 builder.enabled(nodeBooleanValue(fieldNode));
             } else if (fieldName.equals("compress") && fieldNode != null) {
                 builder.compress(nodeBooleanValue(fieldNode));
+            } else if (fieldName.equals("compress_threshold") && fieldNode != null) {
+                if (fieldNode instanceof Number) {
+                    builder.compressThreshold(((Number) fieldNode).longValue());
+                    builder.compress(true);
+                } else {
+                    builder.compressThreshold(ByteSizeValue.parseBytesSizeValue(fieldNode.toString()).bytes());
+                    builder.compress(true);
+                }
             }
         }
         return builder;

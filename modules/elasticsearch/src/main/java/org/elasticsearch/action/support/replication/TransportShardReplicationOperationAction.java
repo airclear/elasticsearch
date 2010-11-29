@@ -103,7 +103,7 @@ public abstract class TransportShardReplicationOperationAction<Request extends S
 
     protected abstract String transportAction();
 
-    protected abstract Response shardOperationOnPrimary(ShardOperationRequest shardRequest);
+    protected abstract Response shardOperationOnPrimary(ClusterState clusterState, ShardOperationRequest shardRequest);
 
     protected abstract void shardOperationOnReplica(ShardOperationRequest shardRequest);
 
@@ -135,7 +135,7 @@ public abstract class TransportShardReplicationOperationAction<Request extends S
         return indicesService.indexServiceSafe(shardRequest.request.index()).shardSafe(shardRequest.shardId);
     }
 
-    private class OperationTransportHandler extends BaseTransportRequestHandler<Request> {
+    class OperationTransportHandler extends BaseTransportRequestHandler<Request> {
 
         @Override public Request newInstance() {
             return newRequestInstance();
@@ -170,7 +170,7 @@ public abstract class TransportShardReplicationOperationAction<Request extends S
         }
     }
 
-    private class ReplicaOperationTransportHandler extends BaseTransportRequestHandler<ShardOperationRequest> {
+    class ReplicaOperationTransportHandler extends BaseTransportRequestHandler<ShardOperationRequest> {
 
         @Override public ShardOperationRequest newInstance() {
             return new ShardOperationRequest();
@@ -215,7 +215,7 @@ public abstract class TransportShardReplicationOperationAction<Request extends S
         }
     }
 
-    private class AsyncShardOperationAction {
+    protected class AsyncShardOperationAction {
 
         private final ActionListener<Response> listener;
 
@@ -254,7 +254,7 @@ public abstract class TransportShardReplicationOperationAction<Request extends S
          * Returns <tt>true</tt> if the action starting to be performed on the primary (or is done).
          */
         public boolean start(final boolean fromClusterEvent) throws ElasticSearchException {
-            ClusterState clusterState = clusterService.state();
+            final ClusterState clusterState = clusterService.state();
             nodes = clusterState.nodes();
             if (!clusterState.routingTable().hasIndex(request.index())) {
                 retry(fromClusterEvent, null);
@@ -265,6 +265,12 @@ public abstract class TransportShardReplicationOperationAction<Request extends S
             } catch (Exception e) {
                 listener.onFailure(e);
                 return true;
+            }
+
+            // no shards, might be in the case between index gateway recovery and shards initialization
+            if (shards.size() == 0) {
+                retry(fromClusterEvent, shards.shardId());
+                return false;
             }
 
             boolean foundPrimary = false;
@@ -307,11 +313,11 @@ public abstract class TransportShardReplicationOperationAction<Request extends S
                         request.beforeLocalFork();
                         threadPool.execute(new Runnable() {
                             @Override public void run() {
-                                performOnPrimary(shard.id(), fromClusterEvent, true, shard);
+                                performOnPrimary(shard.id(), fromClusterEvent, true, shard, clusterState);
                             }
                         });
                     } else {
-                        performOnPrimary(shard.id(), fromClusterEvent, false, shard);
+                        performOnPrimary(shard.id(), fromClusterEvent, false, shard, clusterState);
                     }
                 } else {
                     DiscoveryNode node = nodes.get(shard.currentNodeId());
@@ -325,7 +331,7 @@ public abstract class TransportShardReplicationOperationAction<Request extends S
                             listener.onResponse(response);
                         }
 
-                        @Override public void handleException(RemoteTransportException exp) {
+                        @Override public void handleException(TransportException exp) {
                             // if we got disconnected from the node, or the node / shard is not in the right state (being closed)
                             if (exp.unwrapCause() instanceof ConnectTransportException || exp.unwrapCause() instanceof NodeClosedException ||
                                     exp.unwrapCause() instanceof IllegalIndexShardStateException) {
@@ -407,9 +413,9 @@ public abstract class TransportShardReplicationOperationAction<Request extends S
             }
         }
 
-        private void performOnPrimary(int primaryShardId, boolean fromDiscoveryListener, boolean alreadyThreaded, final ShardRouting shard) {
+        private void performOnPrimary(int primaryShardId, boolean fromDiscoveryListener, boolean alreadyThreaded, final ShardRouting shard, ClusterState clusterState) {
             try {
-                Response response = shardOperationOnPrimary(new ShardOperationRequest(primaryShardId, request));
+                Response response = shardOperationOnPrimary(clusterState, new ShardOperationRequest(primaryShardId, request));
                 performReplicas(response, alreadyThreaded);
             } catch (Exception e) {
                 // shard has not been allocated yet, retry it here
@@ -547,7 +553,7 @@ public abstract class TransportShardReplicationOperationAction<Request extends S
                         finishIfPossible();
                     }
 
-                    @Override public void handleException(RemoteTransportException exp) {
+                    @Override public void handleException(TransportException exp) {
                         if (!ignoreReplicaException(exp.unwrapCause())) {
                             logger.warn("Failed to perform " + transportAction() + " on replica " + shards.shardId(), exp);
                             shardStateAction.shardFailed(shard, "Failed to perform [" + transportAction() + "] on replica, message [" + detailedMessage(exp) + "]");

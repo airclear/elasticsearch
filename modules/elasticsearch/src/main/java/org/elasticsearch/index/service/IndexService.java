@@ -51,7 +51,7 @@ public interface IndexService extends IndexComponent, Iterable<IndexShard>, Clos
 
     SimilarityService similarityService();
 
-    IndexEngine indexEngine();
+    IndexEngine engine();
 
     IndexStore store();
 
@@ -61,6 +61,11 @@ public interface IndexService extends IndexComponent, Iterable<IndexShard>, Clos
      * Cleans the shard locally, does not touch the gateway!.
      */
     void cleanShard(int shardId) throws ElasticSearchException;
+
+    /**
+     * Removes the shard, does not delete local data or the gateway.
+     */
+    void removeShard(int shardId) throws ElasticSearchException;
 
     int numberOfShards();
 

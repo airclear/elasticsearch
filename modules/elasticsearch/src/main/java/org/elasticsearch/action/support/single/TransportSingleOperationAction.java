@@ -106,7 +106,7 @@ public abstract class TransportSingleOperationAction<Request extends SingleOpera
             checkBlock(request, clusterState);
 
             this.shardsIt = clusterService.operationRouting()
-                    .getShards(clusterState, request.index(), request.type(), request.id());
+                    .getShards(clusterState, request.index(), request.type(), request.id(), request.routing());
         }
 
         public void start() {
@@ -188,7 +188,7 @@ public abstract class TransportSingleOperationAction<Request extends SingleOpera
                             }
                         }
 
-                        @Override public void handleException(RemoteTransportException exp) {
+                        @Override public void handleException(TransportException exp) {
                             onFailure(shard, exp);
                         }
 

@@ -38,6 +38,7 @@ import org.elasticsearch.common.io.FileSystemUtils;
 import org.elasticsearch.common.io.Streams;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.*;
+import org.elasticsearch.discovery.Discovery;
 import org.elasticsearch.env.NodeEnvironment;
 import org.elasticsearch.gateway.Gateway;
 import org.elasticsearch.gateway.GatewayException;
@@ -179,7 +180,7 @@ public class LocalGateway extends AbstractLifecycleComponent<Gateway> implements
                     try {
                         createIndexService.createIndex(new MetaDataCreateIndexService.Request("gateway", indexMetaData.index())
                                 .settings(indexMetaData.settings())
-                                .mappingsCompressed(indexMetaData.mappings())
+                                .mappingsMetaData(indexMetaData.mappings())
                                 .state(indexMetaData.state())
                                 .blocks(ImmutableSet.of(GatewayService.INDEX_NOT_RECOVERED_BLOCK))
                                 .timeout(timeValueSeconds(30)),
@@ -192,11 +193,11 @@ public class LocalGateway extends AbstractLifecycleComponent<Gateway> implements
                                     }
 
                                     @Override public void onFailure(Throwable t) {
-                                        logger.error("failed to create index [{}]", indexMetaData.index(), t);
+                                        logger.error("failed to create index [{}]", t, indexMetaData.index());
                                     }
                                 });
                     } catch (IOException e) {
-                        logger.error("failed to create index [{}]", indexMetaData.index(), e);
+                        logger.error("failed to create index [{}]", e, indexMetaData.index());
                     }
                 }
             }
@@ -208,7 +209,7 @@ public class LocalGateway extends AbstractLifecycleComponent<Gateway> implements
     }
 
     @Override public void reset() throws Exception {
-        FileSystemUtils.deleteRecursively(nodeEnv.nodeLocation());
+        FileSystemUtils.deleteRecursively(nodeEnv.nodeDataLocation());
     }
 
     @Override public void clusterChanged(final ClusterChangedEvent event) {
@@ -222,7 +223,10 @@ public class LocalGateway extends AbstractLifecycleComponent<Gateway> implements
             return;
         }
 
-        if (event.state().nodes().localNode().masterNode() && event.metaDataChanged()) {
+        // we only write the local metadata if this is a possible master node, the metadata has changed, and
+        // we don't have a NO_MASTER block (in which case, the routing is cleaned, and we don't want to override what
+        // we have now, since it might be needed when later on performing full state recovery)
+        if (event.state().nodes().localNode().masterNode() && event.metaDataChanged() && !event.state().blocks().hasGlobalBlock(Discovery.NO_MASTER_BLOCK)) {
             executor.execute(new Runnable() {
                 @Override public void run() {
                     LocalGatewayMetaState.Builder builder = LocalGatewayMetaState.builder();
@@ -346,7 +350,7 @@ public class LocalGateway extends AbstractLifecycleComponent<Gateway> implements
             location = null;
         } else {
             // create the location where the state will be stored
-            this.location = new File(nodeEnv.nodeLocation(), "_state");
+            this.location = new File(nodeEnv.nodeDataLocation(), "_state");
             this.location.mkdirs();
 
             if (clusterService.localNode().masterNode()) {

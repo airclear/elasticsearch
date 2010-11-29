@@ -19,6 +19,7 @@
 
 package org.elasticsearch.action.bulk;
 
+import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.ExceptionsHelper;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.ActionRequest;
@@ -31,6 +32,9 @@ import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.support.BaseAction;
 import org.elasticsearch.cluster.ClusterService;
 import org.elasticsearch.cluster.ClusterState;
+import org.elasticsearch.cluster.metadata.MappingMetaData;
+import org.elasticsearch.cluster.routing.GroupShardsIterator;
+import org.elasticsearch.cluster.routing.ShardsIterator;
 import org.elasticsearch.common.UUID;
 import org.elasticsearch.common.collect.Lists;
 import org.elasticsearch.common.collect.Maps;
@@ -149,29 +153,61 @@ public class TransportBulkAction extends BaseAction<BulkRequest, BulkResponse> {
                 deleteRequest.index(clusterState.metaData().concreteIndex(deleteRequest.index()));
             }
         }
+        final BulkItemResponse[] responses = new BulkItemResponse[bulkRequest.requests.size()];
+
 
         // first, go over all the requests and create a ShardId -> Operations mapping
         Map<ShardId, List<BulkItemRequest>> requestsByShard = Maps.newHashMap();
         for (int i = 0; i < bulkRequest.requests.size(); i++) {
             ActionRequest request = bulkRequest.requests.get(i);
-            ShardId shardId = null;
             if (request instanceof IndexRequest) {
                 IndexRequest indexRequest = (IndexRequest) request;
-                shardId = clusterService.operationRouting().indexShards(clusterState, indexRequest.index(), indexRequest.type(), indexRequest.id()).shardId();
+                // handle routing
+                MappingMetaData mappingMd = clusterState.metaData().index(indexRequest.index()).mapping(indexRequest.type());
+                if (mappingMd != null) {
+                    try {
+                        indexRequest.processRouting(mappingMd);
+                    } catch (ElasticSearchException e) {
+                        responses[i] = new BulkItemResponse(i, indexRequest.opType().toString().toLowerCase(),
+                                new BulkItemResponse.Failure(indexRequest.index(), indexRequest.type(), indexRequest.id(), e.getDetailedMessage()));
+                        continue;
+                    }
+                }
+
+                ShardId shardId = clusterService.operationRouting().indexShards(clusterState, indexRequest.index(), indexRequest.type(), indexRequest.id(), indexRequest.routing()).shardId();
+                List<BulkItemRequest> list = requestsByShard.get(shardId);
+                if (list == null) {
+                    list = Lists.newArrayList();
+                    requestsByShard.put(shardId, list);
+                }
+                list.add(new BulkItemRequest(i, request));
             } else if (request instanceof DeleteRequest) {
                 DeleteRequest deleteRequest = (DeleteRequest) request;
-                shardId = clusterService.operationRouting().deleteShards(clusterState, deleteRequest.index(), deleteRequest.type(), deleteRequest.id()).shardId();
+                MappingMetaData mappingMd = clusterState.metaData().index(deleteRequest.index()).mapping(deleteRequest.type());
+                if (mappingMd != null && mappingMd.routing().required() && deleteRequest.routing() == null) {
+                    // if routing is required, and no routing on the delete request, we need to broadcast it....
+                    GroupShardsIterator groupShards = clusterService.operationRouting().broadcastDeleteShards(clusterState, deleteRequest.index());
+                    for (ShardsIterator shardsId : groupShards) {
+                        List<BulkItemRequest> list = requestsByShard.get(shardsId.shardId());
+                        if (list == null) {
+                            list = Lists.newArrayList();
+                            requestsByShard.put(shardsId.shardId(), list);
+                        }
+                        list.add(new BulkItemRequest(i, request));
+                    }
+                } else {
+                    ShardId shardId = clusterService.operationRouting().deleteShards(clusterState, deleteRequest.index(), deleteRequest.type(), deleteRequest.id(), deleteRequest.routing()).shardId();
+                    List<BulkItemRequest> list = requestsByShard.get(shardId);
+                    if (list == null) {
+                        list = Lists.newArrayList();
+                        requestsByShard.put(shardId, list);
+                    }
+                    list.add(new BulkItemRequest(i, request));
+                }
             }
-            List<BulkItemRequest> list = requestsByShard.get(shardId);
-            if (list == null) {
-                list = Lists.newArrayList();
-                requestsByShard.put(shardId, list);
-            }
-            list.add(new BulkItemRequest(i, request));
         }
 
         final AtomicInteger counter = new AtomicInteger(requestsByShard.size());
-        final BulkItemResponse[] responses = new BulkItemResponse[bulkRequest.requests.size()];
         for (Map.Entry<ShardId, List<BulkItemRequest>> entry : requestsByShard.entrySet()) {
             final ShardId shardId = entry.getKey();
             final List<BulkItemRequest> requests = entry.getValue();

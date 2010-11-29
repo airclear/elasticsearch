@@ -22,8 +22,6 @@ package org.elasticsearch.discovery.zen;
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.ElasticSearchIllegalStateException;
 import org.elasticsearch.cluster.*;
-import org.elasticsearch.cluster.block.ClusterBlock;
-import org.elasticsearch.cluster.block.ClusterBlockLevel;
 import org.elasticsearch.cluster.block.ClusterBlocks;
 import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.cluster.node.DiscoveryNode;
@@ -63,8 +61,6 @@ import static org.elasticsearch.common.unit.TimeValue.*;
  */
 public class ZenDiscovery extends AbstractLifecycleComponent<Discovery> implements Discovery, DiscoveryNodesProvider {
 
-    public final ClusterBlock NO_MASTER_BLOCK = new ClusterBlock(2, "no master", ClusterBlockLevel.ALL);
-
     private final ThreadPool threadPool;
 
     private final TransportService transportService;
@@ -88,8 +84,6 @@ public class ZenDiscovery extends AbstractLifecycleComponent<Discovery> implemen
 
     // a flag that should be used only for testing
     private final boolean sendLeaveRequest;
-
-    private final boolean blockClusterOnNoMaster;
 
     private final ElectMasterService electMaster;
 
@@ -116,7 +110,6 @@ public class ZenDiscovery extends AbstractLifecycleComponent<Discovery> implemen
 
         this.initialPingTimeout = componentSettings.getAsTime("initial_ping_timeout", timeValueSeconds(3));
         this.sendLeaveRequest = componentSettings.getAsBoolean("send_leave_request", true);
-        this.blockClusterOnNoMaster = componentSettings.getAsBoolean("block_on_no_master", true);
 
         logger.debug("using initial_ping_timeout [{}]", initialPingTimeout);
 
@@ -461,9 +454,10 @@ public class ZenDiscovery extends AbstractLifecycleComponent<Discovery> implemen
             clusterService.submitStateUpdateTask("zen-disco-receive(from node[" + node + "])", new ClusterStateUpdateTask() {
                 @Override public ClusterState execute(ClusterState currentState) {
                     if (currentState.nodes().nodeExists(node.id())) {
-                        // no change, the node already exists in the cluster
+                        // the node already exists in the cluster
                         logger.warn("received a join request for an existing node [{}]", node);
-                        return currentState;
+                        // still send a new cluster state, so it will be re published and possibly update the other node
+                        return ClusterState.builder().state(currentState).build();
                     }
                     return newClusterStateBuilder().state(currentState).nodes(currentState.nodes().newNode(node)).build();
                 }
