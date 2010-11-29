@@ -1,5 +1,5 @@
 #!/bin/sh
-ZIP=`pwd`/plugins/cassandra/build/distributions/elasticsearch-cassandra-0.13.0-SNAPSHOT.zip
+ZIP=`pwd`/plugins/cassandra/build/distributions/elasticsearch-cassandra-*.zip
 PLUGINS=`pwd`/build/distributions/exploded/plugins
 CASSANDRA=$PLUGINS/cassandra
 #./gradlew :explodedDist
