@@ -93,7 +93,8 @@ public class LruClient extends NodeClient {
                               TransportMoreLikeThisAction moreLikeThisAction) {
         super(settings,threadPool,admin,indexAction,deleteAction,bulkAction,deleteByQueryAction,getAction,countAction,searchAction,searchScrollAction,moreLikeThisAction);
         this.logger = Loggers.getLogger(getClass());
-        this.cache = Collections.synchronizedMap(new LruCache(settings.getAsInt("node.lrucache.size", 1)));
+    this.logger.debug("Lru cache size = " + settings.getAsInt("client.lru.size", 1));
+        this.cache = Collections.synchronizedMap(new LruCache(settings.getAsInt("client.lru.size", 1)));
     }
 
     private void ensureOpen(final String index) {
