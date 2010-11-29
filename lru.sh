@@ -1,5 +1,5 @@
 #!/bin/sh
-ZIP=`pwd`/plugins/client/lru/build/distributions/elasticsearch-client-lru-0.13.0-SNAPSHOT.zip
+ZIP=`pwd`/plugins/client/lru/build/distributions/elasticsearch-client-lru-*.zip
 PLUGINS=`pwd`/build/distributions/exploded/plugins
 LRU=$PLUGINS/lruclient
 #./gradlew :explodedDist
