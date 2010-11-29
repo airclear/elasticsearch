@@ -19,6 +19,8 @@
 
 package org.elasticsearch.index.mapper.xcontent;
 
+import org.elasticsearch.index.mapper.xcontent.ip.IpFieldMapper;
+
 /**
  * @author kimchy (shay.banon)
  */
@@ -40,6 +42,10 @@ public final class XContentMapperBuilders {
         return new IdFieldMapper.Builder();
     }
 
+    public static RoutingFieldMapper.Builder routing() {
+        return new RoutingFieldMapper.Builder();
+    }
+
     public static UidFieldMapper.Builder uid() {
         return new UidFieldMapper.Builder();
     }
@@ -58,6 +64,10 @@ public final class XContentMapperBuilders {
 
     public static AllFieldMapper.Builder all() {
         return new AllFieldMapper.Builder();
+    }
+
+    public static AnalyzerMapper.Builder analyzer() {
+        return new AnalyzerMapper.Builder();
     }
 
     public static MultiFieldMapper.Builder multiField(String name) {

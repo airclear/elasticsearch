@@ -131,7 +131,7 @@ public class DateFieldMapper extends NumberFieldMapper<Long> {
     }
 
     @Override public Long valueFromString(String value) {
-        return dateTimeFormatter.parser().parseMillis(value);
+        return parseStringValue(value);
     }
 
     /**
@@ -155,15 +155,15 @@ public class DateFieldMapper extends NumberFieldMapper<Long> {
 
     @Override public Query rangeQuery(String lowerTerm, String upperTerm, boolean includeLower, boolean includeUpper) {
         return NumericRangeQuery.newLongRange(names.indexName(), precisionStep,
-                lowerTerm == null ? null : dateTimeFormatter.parser().parseMillis(lowerTerm),
-                upperTerm == null ? null : dateTimeFormatter.parser().parseMillis(upperTerm),
+                lowerTerm == null ? null : parseStringValue(lowerTerm),
+                upperTerm == null ? null : parseStringValue(upperTerm),
                 includeLower, includeUpper);
     }
 
     @Override public Filter rangeFilter(String lowerTerm, String upperTerm, boolean includeLower, boolean includeUpper) {
         return NumericRangeFilter.newLongRange(names.indexName(), precisionStep,
-                lowerTerm == null ? null : dateTimeFormatter.parser().parseMillis(lowerTerm),
-                upperTerm == null ? null : dateTimeFormatter.parser().parseMillis(upperTerm),
+                lowerTerm == null ? null : parseStringValue(lowerTerm),
+                upperTerm == null ? null : parseStringValue(upperTerm),
                 includeLower, includeUpper);
     }
 
@@ -189,7 +189,7 @@ public class DateFieldMapper extends NumberFieldMapper<Long> {
             context.allEntries().addText(names.fullName(), dateAsString, boost);
         }
 
-        long value = dateTimeFormatter.parser().parseMillis(dateAsString);
+        long value = parseStringValue(dateAsString);
         Field field = null;
         if (stored()) {
             field = new Field(names.indexName(), Numbers.longToBytes(value), store);
@@ -222,12 +222,42 @@ public class DateFieldMapper extends NumberFieldMapper<Long> {
 
     @Override protected void doXContentBody(XContentBuilder builder) throws IOException {
         super.doXContentBody(builder);
+        if (index != Defaults.INDEX) {
+            builder.field("index", index.name().toLowerCase());
+        }
+        if (store != Defaults.STORE) {
+            builder.field("store", store.name().toLowerCase());
+        }
+        if (termVector != Defaults.TERM_VECTOR) {
+            builder.field("term_vector", termVector.name().toLowerCase());
+        }
+        if (omitNorms != Defaults.OMIT_NORMS) {
+            builder.field("omit_norms", omitNorms);
+        }
+        if (omitTermFreqAndPositions != Defaults.OMIT_TERM_FREQ_AND_POSITIONS) {
+            builder.field("omit_term_freq_and_positions", omitTermFreqAndPositions);
+        }
+        if (precisionStep != Defaults.PRECISION_STEP) {
+            builder.field("precision_step", precisionStep);
+        }
         builder.field("format", dateTimeFormatter.format());
         if (nullValue != null) {
             builder.field("null_value", nullValue);
         }
         if (includeInAll != null) {
             builder.field("include_in_all", includeInAll);
+        }
+    }
+
+    private long parseStringValue(String value) {
+        try {
+            return dateTimeFormatter.parser().parseMillis(value);
+        } catch (RuntimeException e) {
+            try {
+                return Long.parseLong(value);
+            } catch (NumberFormatException e1) {
+                throw new MapperParsingException("failed to parse date field, tried both date format [" + dateTimeFormatter.format() + "], and timestamp number", e);
+            }
         }
     }
 }

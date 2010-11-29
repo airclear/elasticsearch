@@ -264,12 +264,10 @@ public interface Engine extends IndexShardComponent, CloseableComponent {
 
     static class Create implements Operation {
         private final ParsedDocument doc;
-        private final Analyzer analyzer;
         private boolean refresh;
 
-        public Create(ParsedDocument doc, Analyzer analyzer) {
+        public Create(ParsedDocument doc) {
             this.doc = doc;
-            this.analyzer = analyzer;
         }
 
         @Override public Type opType() {
@@ -288,12 +286,16 @@ public interface Engine extends IndexShardComponent, CloseableComponent {
             return this.doc.id();
         }
 
+        public String routing() {
+            return this.doc.routing();
+        }
+
         public Document doc() {
             return this.doc.doc();
         }
 
         public Analyzer analyzer() {
-            return this.analyzer;
+            return this.doc.analyzer();
         }
 
         public byte[] source() {
@@ -312,13 +314,11 @@ public interface Engine extends IndexShardComponent, CloseableComponent {
     static class Index implements Operation {
         private final Term uid;
         private final ParsedDocument doc;
-        private final Analyzer analyzer;
         private boolean refresh;
 
-        public Index(Term uid, ParsedDocument doc, Analyzer analyzer) {
+        public Index(Term uid, ParsedDocument doc) {
             this.uid = uid;
             this.doc = doc;
-            this.analyzer = analyzer;
         }
 
         @Override public Type opType() {
@@ -338,7 +338,7 @@ public interface Engine extends IndexShardComponent, CloseableComponent {
         }
 
         public Analyzer analyzer() {
-            return this.analyzer;
+            return this.doc.analyzer();
         }
 
         public String id() {
@@ -347,6 +347,10 @@ public interface Engine extends IndexShardComponent, CloseableComponent {
 
         public String type() {
             return this.doc.type();
+        }
+
+        public String routing() {
+            return this.doc.routing();
         }
 
         public byte[] source() {

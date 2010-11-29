@@ -60,7 +60,7 @@ public class FsTranslog extends AbstractIndexShardComponent implements Translog 
 
     @Inject public FsTranslog(ShardId shardId, @IndexSettings Settings indexSettings, NodeEnvironment nodeEnv) {
         super(shardId, indexSettings);
-        this.location = new File(new File(new File(new File(nodeEnv.nodeLocation(), "indices"), shardId.index().name()), Integer.toString(shardId.id())), "translog");
+        this.location = new File(nodeEnv.shardLocation(shardId), "translog");
         this.location.mkdirs();
         this.useStream = componentSettings.getAsBoolean("use_stream", false);
     }
@@ -90,6 +90,24 @@ public class FsTranslog extends AbstractIndexShardComponent implements Translog 
 
     @Override public ByteSizeValue estimateMemorySize() {
         return new ByteSizeValue(0, ByteSizeUnit.BYTES);
+    }
+
+    @Override public void clearUnreferenced() {
+        synchronized (mutex) {
+            File[] files = location.listFiles();
+            if (files != null) {
+                for (File file : files) {
+                    if (file.getName().equals("translog-" + id)) {
+                        continue;
+                    }
+                    try {
+                        file.delete();
+                    } catch (Exception e) {
+                        // ignore
+                    }
+                }
+            }
+        }
     }
 
     @Override public void newTranslog() throws TranslogException {
@@ -162,7 +180,7 @@ public class FsTranslog extends AbstractIndexShardComponent implements Translog 
                 } else {
                     return new FsChannelSnapshot(shardId, this.id, raf, lastPosition, operationCounter.get(), operationCounter.get());
                 }
-            } catch (IOException e) {
+            } catch (Exception e) {
                 throw new TranslogException(shardId, "Failed to snapshot", e);
             }
         }
@@ -184,7 +202,7 @@ public class FsTranslog extends AbstractIndexShardComponent implements Translog 
                     newSnapshot.seekForward(snapshot.position());
                     return newSnapshot;
                 }
-            } catch (IOException e) {
+            } catch (Exception e) {
                 throw new TranslogException(shardId, "Failed to snapshot", e);
             }
         }

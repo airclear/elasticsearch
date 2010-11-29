@@ -11,7 +11,7 @@ SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss");
 sdf.setTimeZone(TimeZone.getTimeZone("UTC"));
 buildTimeStr = sdf.format(buildTime)
 
-versionNumber = '0.13.0-SNAPSHOT'
+versionNumber = '0.13.0'
 
 explodedDistDir = new File(distsDir, 'exploded')
 explodedDistLibDir = new File(explodedDistDir, 'lib')
@@ -49,6 +49,7 @@ allprojects {
         mavenRepo urls: 'http://elasticsearch.googlecode.com/svn/maven'
         mavenRepo urls: 'http://oss.sonatype.org/content/repositories/releases'
         mavenRepo urls: 'http://oss.sonatype.org/content/repositories/snapshots'
+        mavenRepo urls: 'http://download.java.net/maven/2/'
     }
 }
 
@@ -103,25 +104,44 @@ task explodedDist(dependsOn: [configurations.distLib], description: 'Builds a mi
 }
 
 task zip(type: Zip, dependsOn: ['explodedDist']) {
-    zipRootFolder = "$archivesBaseName-${-> version}"
+    rootFolder = "$archivesBaseName-${-> version}"
     from(explodedDistDir) {
-        into zipRootFolder
+        into rootFolder
         exclude 'bin/elasticsearch'
         exclude 'bin/plugin'
     }
     from(explodedDistDir) {
-        into zipRootFolder
+        into rootFolder
         include 'bin/elasticsearch'
         include 'bin/plugin'
         fileMode = 0755
     }
 }
 
-task release(dependsOn: [zip]) << {
+task tar(type: Tar, dependsOn: ['explodedDist']) {
+    compression = Compression.GZIP
+    extension = "tar.gz"
+    rootFolder = "$archivesBaseName-${-> version}"
+    from(explodedDistDir) {
+        into rootFolder
+        exclude 'bin/*.bat'
+        exclude 'bin/elasticsearch'
+        exclude 'bin/plugin'
+        exclude 'lib/sigar/*win*'
+    }
+    from(explodedDistDir) {
+        into rootFolder
+        include 'bin/elasticsearch'
+        include 'bin/plugin'
+        fileMode = 0755
+    }
+}
+
+task release(dependsOn: [zip, tar]) << {
     ant.delete(dir: explodedDistDir)
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '0.9-rc-1'
+    gradleVersion = '0.9-rc-2'
     jarPath = 'gradle'
 }

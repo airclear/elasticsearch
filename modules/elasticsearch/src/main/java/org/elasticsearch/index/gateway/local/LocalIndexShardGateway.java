@@ -81,7 +81,7 @@ public class LocalIndexShardGateway extends AbstractIndexShardComponent implemen
     }
 
     @Override public void recover(RecoveryStatus recoveryStatus) throws IndexShardGatewayRecoveryException {
-        recoveryStatus().index().startTime(System.currentTimeMillis());
+        recoveryStatus.index().startTime(System.currentTimeMillis());
         long version = -1;
         try {
             if (IndexReader.indexExists(indexShard.store().directory())) {
@@ -171,6 +171,10 @@ public class LocalIndexShardGateway extends AbstractIndexShardComponent implemen
         if (flushScheduler != null) {
             flushScheduler.cancel(false);
         }
+    }
+
+    @Override public SnapshotLock obtainSnapshotLock() throws Exception {
+        return NO_SNAPSHOT_LOCK;
     }
 
     private class Sync implements Runnable {

@@ -17,14 +17,37 @@
  * under the License.
  */
 
-package org.elasticsearch.index.mapper;
+package org.elasticsearch.action;
+
+import org.elasticsearch.ElasticSearchException;
 
 /**
- * @author kimchy (Shay Banon)
+ * @author kimchy (shay.banon)
  */
-public class InvalidTypeNameException extends MapperException {
+public class RoutingMissingException extends ElasticSearchException {
 
-    public InvalidTypeNameException(String message) {
-        super(message);
+    private final String index;
+
+    private final String type;
+
+    private final String id;
+
+    public RoutingMissingException(String index, String type, String id) {
+        super("routing is required for [" + index + "]/[" + type + "]/[" + id + "]");
+        this.index = index;
+        this.type = type;
+        this.id = id;
+    }
+
+    public String index() {
+        return index;
+    }
+
+    public String type() {
+        return type;
+    }
+
+    public String id() {
+        return id;
     }
 }

@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.elasticsearch.index.mapper.xcontent;
+package org.elasticsearch.index.mapper.xcontent.ip;
 
 import org.apache.lucene.analysis.NumericTokenStream;
 import org.apache.lucene.document.Field;
@@ -38,6 +38,10 @@ import org.elasticsearch.index.analysis.NumericTokenizer;
 import org.elasticsearch.index.field.data.FieldDataType;
 import org.elasticsearch.index.mapper.MapperParsingException;
 import org.elasticsearch.index.mapper.MergeMappingException;
+import org.elasticsearch.index.mapper.xcontent.MergeContext;
+import org.elasticsearch.index.mapper.xcontent.NumberFieldMapper;
+import org.elasticsearch.index.mapper.xcontent.ParseContext;
+import org.elasticsearch.index.mapper.xcontent.XContentMapper;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -237,6 +241,24 @@ public class IpFieldMapper extends NumberFieldMapper<Long> {
 
     @Override protected void doXContentBody(XContentBuilder builder) throws IOException {
         super.doXContentBody(builder);
+        if (index != Defaults.INDEX) {
+            builder.field("index", index.name().toLowerCase());
+        }
+        if (store != Defaults.STORE) {
+            builder.field("store", store.name().toLowerCase());
+        }
+        if (termVector != Defaults.TERM_VECTOR) {
+            builder.field("term_vector", termVector.name().toLowerCase());
+        }
+        if (omitNorms != Defaults.OMIT_NORMS) {
+            builder.field("omit_norms", omitNorms);
+        }
+        if (omitTermFreqAndPositions != Defaults.OMIT_TERM_FREQ_AND_POSITIONS) {
+            builder.field("omit_term_freq_and_positions", omitTermFreqAndPositions);
+        }
+        if (precisionStep != Defaults.PRECISION_STEP) {
+            builder.field("precision_step", precisionStep);
+        }
         if (nullValue != null) {
             builder.field("null_value", nullValue);
         }
