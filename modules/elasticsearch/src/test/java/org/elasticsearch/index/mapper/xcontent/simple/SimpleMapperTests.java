@@ -79,7 +79,7 @@ public class SimpleMapperTests {
         String mapping = copyToStringFromClasspath("/org/elasticsearch/index/mapper/xcontent/simple/test-mapping.json");
         XContentDocumentMapper docMapper = MapperTests.newParser().parse(mapping);
 
-        assertThat((String) docMapper.attributes().get("param1"), equalTo("value1"));
+        assertThat((String) docMapper.meta().get("param1"), equalTo("value1"));
 
         byte[] json = copyToBytesFromClasspath("/org/elasticsearch/index/mapper/xcontent/simple/test1.json");
         Document doc = docMapper.parse(json).doc();
@@ -102,5 +102,16 @@ public class SimpleMapperTests {
         assertThat(doc.getFields(docMapper.idMapper().names().indexName()).length, equalTo(1));
 //        System.out.println("Document: " + doc);
 //        System.out.println("Json: " + docMapper.sourceMapper().value(doc));
+    }
+
+    @Test public void testAttributes() throws Exception {
+        String mapping = copyToStringFromClasspath("/org/elasticsearch/index/mapper/xcontent/simple/test-mapping.json");
+        XContentDocumentMapper docMapper = MapperTests.newParser().parse(mapping);
+
+        assertThat((String) docMapper.meta().get("param1"), equalTo("value1"));
+
+        String builtMapping = docMapper.mappingSource().string();
+        XContentDocumentMapper builtDocMapper = MapperTests.newParser().parse(builtMapping);
+        assertThat((String) builtDocMapper.meta().get("param1"), equalTo("value1"));
     }
 }

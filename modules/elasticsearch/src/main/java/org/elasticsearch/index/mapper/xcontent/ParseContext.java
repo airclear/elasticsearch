@@ -19,11 +19,16 @@
 
 package org.elasticsearch.index.mapper.xcontent;
 
+import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.document.Document;
 import org.elasticsearch.common.lucene.all.AllEntries;
 import org.elasticsearch.common.util.concurrent.NotThreadSafe;
 import org.elasticsearch.common.xcontent.XContentParser;
+import org.elasticsearch.index.analysis.AnalysisService;
 import org.elasticsearch.index.mapper.DocumentMapper;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * @author kimchy (Shay Banon)
@@ -41,6 +46,8 @@ public class ParseContext {
 
     private Document document;
 
+    private Analyzer analyzer;
+
     private String index;
 
     private String type;
@@ -54,6 +61,8 @@ public class ParseContext {
     private String uid;
 
     private StringBuilder stringBuilder = new StringBuilder();
+
+    private Map<String, String> ignoredValues = new HashMap<String, String>();
 
     private ParsedIdState parsedIdState;
 
@@ -75,13 +84,15 @@ public class ParseContext {
     public void reset(XContentParser parser, Document document, String type, byte[] source, DocumentMapper.ParseListener listener) {
         this.parser = parser;
         this.document = document;
+        this.analyzer = null;
         this.type = type;
         this.source = source;
         this.path.reset();
         this.parsedIdState = ParsedIdState.NO;
         this.mappersAdded = false;
-        this.listener = listener;
+        this.listener = listener == null ? DocumentMapper.ParseListener.EMPTY : listener;
         this.allEntries = new AllEntries();
+        this.ignoredValues.clear();
     }
 
     public XContentDocumentMapperParser docMapperParser() {
@@ -132,6 +143,10 @@ public class ParseContext {
         return this.docMapper;
     }
 
+    public AnalysisService analysisService() {
+        return docMapperParser.analysisService;
+    }
+
     public String id() {
         return id;
     }
@@ -142,6 +157,14 @@ public class ParseContext {
 
     public ParsedIdState parsedIdState() {
         return this.parsedIdState;
+    }
+
+    public void ignoredValue(String indexName, String value) {
+        ignoredValues.put(indexName, value);
+    }
+
+    public String ignoredValue(String indexName) {
+        return ignoredValues.get(indexName);
     }
 
     /**
@@ -164,6 +187,14 @@ public class ParseContext {
 
     public AllEntries allEntries() {
         return this.allEntries;
+    }
+
+    public Analyzer analyzer() {
+        return this.analyzer;
+    }
+
+    public void analyzer(Analyzer analyzer) {
+        this.analyzer = analyzer;
     }
 
     public void externalValue(Object externalValue) {

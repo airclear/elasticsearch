@@ -25,11 +25,15 @@ import org.elasticsearch.action.TransportActions;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
 import org.elasticsearch.action.admin.indices.create.TransportCreateIndexAction;
+import org.elasticsearch.action.delete.index.IndexDeleteRequest;
+import org.elasticsearch.action.delete.index.IndexDeleteResponse;
+import org.elasticsearch.action.delete.index.TransportIndexDeleteAction;
 import org.elasticsearch.action.support.replication.TransportShardReplicationOperationAction;
 import org.elasticsearch.cluster.ClusterService;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.action.shard.ShardStateAction;
 import org.elasticsearch.cluster.block.ClusterBlockLevel;
+import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.cluster.routing.ShardsIterator;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
@@ -51,11 +55,14 @@ public class TransportDeleteAction extends TransportShardReplicationOperationAct
 
     private final TransportCreateIndexAction createIndexAction;
 
+    private final TransportIndexDeleteAction indexDeleteAction;
+
     @Inject public TransportDeleteAction(Settings settings, TransportService transportService, ClusterService clusterService,
                                          IndicesService indicesService, ThreadPool threadPool, ShardStateAction shardStateAction,
-                                         TransportCreateIndexAction createIndexAction) {
+                                         TransportCreateIndexAction createIndexAction, TransportIndexDeleteAction indexDeleteAction) {
         super(settings, transportService, clusterService, indicesService, threadPool, shardStateAction);
         this.createIndexAction = createIndexAction;
+        this.indexDeleteAction = indexDeleteAction;
         this.autoCreateIndex = settings.getAsBoolean("action.auto_create_index", true);
     }
 
@@ -63,21 +70,46 @@ public class TransportDeleteAction extends TransportShardReplicationOperationAct
         if (autoCreateIndex && !clusterService.state().metaData().hasConcreteIndex(deleteRequest.index())) {
             createIndexAction.execute(new CreateIndexRequest(deleteRequest.index()), new ActionListener<CreateIndexResponse>() {
                 @Override public void onResponse(CreateIndexResponse result) {
-                    TransportDeleteAction.super.doExecute(deleteRequest, listener);
+                    innerExecute(deleteRequest, listener);
                 }
 
                 @Override public void onFailure(Throwable e) {
                     if (ExceptionsHelper.unwrapCause(e) instanceof IndexAlreadyExistsException) {
                         // we have the index, do it
-                        TransportDeleteAction.super.doExecute(deleteRequest, listener);
+                        innerExecute(deleteRequest, listener);
                     } else {
                         listener.onFailure(e);
                     }
                 }
             });
         } else {
-            super.doExecute(deleteRequest, listener);
+            innerExecute(deleteRequest, listener);
         }
+    }
+
+    private void innerExecute(final DeleteRequest request, final ActionListener<DeleteResponse> listener) {
+        ClusterState clusterState = clusterService.state();
+        request.index(clusterState.metaData().concreteIndex(request.index())); // we need to get the concrete index here...
+        if (clusterState.metaData().hasIndex(request.index())) {
+            // check if routing is required, if so, do a broadcast delete
+            MappingMetaData mappingMd = clusterState.metaData().index(request.index()).mapping(request.type());
+            if (mappingMd != null && mappingMd.routing().required()) {
+                if (request.routing() == null) {
+                    indexDeleteAction.execute(new IndexDeleteRequest(request), new ActionListener<IndexDeleteResponse>() {
+                        @Override public void onResponse(IndexDeleteResponse indexDeleteResponse) {
+                            // TODO what do we do with specific failed shards?
+                            listener.onResponse(new DeleteResponse(request.index(), request.type(), request.id()));
+                        }
+
+                        @Override public void onFailure(Throwable e) {
+                            listener.onFailure(e);
+                        }
+                    });
+                    return;
+                }
+            }
+        }
+        super.doExecute(request, listener);
     }
 
     @Override protected boolean checkWriteConsistency() {
@@ -100,9 +132,12 @@ public class TransportDeleteAction extends TransportShardReplicationOperationAct
         state.blocks().indexBlockedRaiseException(ClusterBlockLevel.WRITE, request.index());
     }
 
-    @Override protected DeleteResponse shardOperationOnPrimary(ShardOperationRequest shardRequest) {
+    @Override protected DeleteResponse shardOperationOnPrimary(ClusterState clusterState, ShardOperationRequest shardRequest) {
         DeleteRequest request = shardRequest.request;
-        indexShard(shardRequest).delete(request.type(), request.id());
+        IndexShard indexShard = indexShard(shardRequest);
+        Engine.Delete delete = indexShard.prepareDelete(request.type(), request.id());
+        delete.refresh(request.refresh());
+        indexShard.delete(delete);
         return new DeleteResponse(request.index(), request.type(), request.id());
     }
 
@@ -116,6 +151,6 @@ public class TransportDeleteAction extends TransportShardReplicationOperationAct
 
     @Override protected ShardsIterator shards(ClusterState clusterState, DeleteRequest request) {
         return clusterService.operationRouting()
-                .deleteShards(clusterService.state(), request.index(), request.type(), request.id());
+                .deleteShards(clusterService.state(), request.index(), request.type(), request.id(), request.routing());
     }
 }

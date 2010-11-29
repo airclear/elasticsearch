@@ -42,6 +42,8 @@ public class GetRequest extends SingleOperationRequest {
 
     private String[] fields;
 
+    private boolean refresh = false;
+
     GetRequest() {
     }
 
@@ -89,6 +91,16 @@ public class GetRequest extends SingleOperationRequest {
     }
 
     /**
+     * Controls the shard routing of the request. Using this value to hash the shard
+     * and not the id.
+     */
+    public GetRequest routing(String routing) {
+        this.routing = routing;
+        return this;
+    }
+
+
+    /**
      * Explicitly specify the fields that will be returned. By default, the <tt>_source</tt>
      * field will be returned.
      */
@@ -103,6 +115,20 @@ public class GetRequest extends SingleOperationRequest {
      */
     public String[] fields() {
         return this.fields;
+    }
+
+    /**
+     * Should a refresh be executed before this get operation causing the operation to
+     * return the latest value. Note, heavy get should not set this to <tt>true</tt>. Defaults
+     * to <tt>false</tt>.
+     */
+    public GetRequest refresh(boolean refresh) {
+        this.refresh = refresh;
+        return this;
+    }
+
+    public boolean refresh() {
+        return this.refresh;
     }
 
     /**
@@ -123,6 +149,7 @@ public class GetRequest extends SingleOperationRequest {
 
     @Override public void readFrom(StreamInput in) throws IOException {
         super.readFrom(in);
+        refresh = in.readBoolean();
         int size = in.readInt();
         if (size >= 0) {
             fields = new String[size];
@@ -134,6 +161,7 @@ public class GetRequest extends SingleOperationRequest {
 
     @Override public void writeTo(StreamOutput out) throws IOException {
         super.writeTo(out);
+        out.writeBoolean(refresh);
         if (fields == null) {
             out.writeInt(-1);
         } else {

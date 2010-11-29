@@ -24,9 +24,11 @@ import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.collect.ImmutableMap;
 import org.elasticsearch.common.joda.FormatDateTimeFormatter;
 import org.elasticsearch.common.util.concurrent.ThreadSafe;
+import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.mapper.*;
+import org.elasticsearch.index.mapper.xcontent.ip.IpFieldMapper;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -320,13 +322,18 @@ public class ObjectMapper implements XContentMapper, IncludeInAllMapper {
                     if (objectMapper != null) {
                         objectMapper.parse(context);
                     } else {
-                        BuilderContext builderContext = new BuilderContext(context.path());
                         XContentMapper.Builder builder = context.root().findTemplateBuilder(context, currentFieldName, "object");
                         if (builder == null) {
                             builder = XContentMapperBuilders.object(currentFieldName).enabled(true).dynamic(dynamic).pathType(pathType);
                         }
+                        // remove the current field name from path, since the object builder adds it as well...
+                        context.path().remove();
+                        BuilderContext builderContext = new BuilderContext(context.path());
                         objectMapper = builder.build(builderContext);
                         putMapper(objectMapper);
+
+                        // now re add it and parse...
+                        context.path().add(currentFieldName);
                         objectMapper.parse(context);
                         context.addedMapper();
                     }
@@ -386,7 +393,7 @@ public class ObjectMapper implements XContentMapper, IncludeInAllMapper {
             if (token == XContentParser.Token.VALUE_STRING) {
                 String text = context.parser().text();
                 // check if it fits one of the date formats
-                boolean isDate = false;
+                boolean resolved = false;
                 // a safe check since "1" gets parsed as well
                 if (text.contains(":") || text.contains("-") || text.contains("/")) {
                     for (FormatDateTimeFormatter dateTimeFormatter : context.root().dateTimeFormatters()) {
@@ -397,14 +404,28 @@ public class ObjectMapper implements XContentMapper, IncludeInAllMapper {
                                 builder = dateField(currentFieldName).dateTimeFormatter(dateTimeFormatter);
                             }
                             mapper = builder.build(builderContext);
-                            isDate = true;
+                            resolved = true;
                             break;
                         } catch (Exception e) {
                             // failure to parse this, continue
                         }
                     }
                 }
-                if (!isDate) {
+                // check if its an ip
+                if (!resolved && text.indexOf('.') != -1) {
+                    try {
+                        IpFieldMapper.ipToLong(text);
+                        XContentMapper.Builder builder = context.root().findTemplateBuilder(context, currentFieldName, "ip");
+                        if (builder == null) {
+                            builder = ipField(currentFieldName);
+                        }
+                        mapper = builder.build(builderContext);
+                        resolved = true;
+                    } catch (Exception e) {
+                        // failure to parse, not ip...
+                    }
+                }
+                if (!resolved) {
                     XContentMapper.Builder builder = context.root().findTemplateBuilder(context, currentFieldName, "string");
                     if (builder == null) {
                         builder = stringField(currentFieldName);
@@ -527,17 +548,29 @@ public class ObjectMapper implements XContentMapper, IncludeInAllMapper {
     }
 
     @Override public void toXContent(XContentBuilder builder, Params params) throws IOException {
-        toXContent(builder, params, XContentMapper.EMPTY_ARRAY);
+        toXContent(builder, params, null, XContentMapper.EMPTY_ARRAY);
     }
 
-    public void toXContent(XContentBuilder builder, Params params, XContentMapper... additionalMappers) throws IOException {
+    public void toXContent(XContentBuilder builder, Params params, ToXContent custom, XContentMapper... additionalMappers) throws IOException {
         builder.startObject(name);
-        builder.field("type", CONTENT_TYPE);
-        builder.field("dynamic", dynamic);
-        builder.field("enabled", enabled);
-        builder.field("path", pathType.name().toLowerCase());
+        if (mappers.isEmpty()) { // only write the object content type if there are no properties, otherwise, it is automatically detected
+            builder.field("type", CONTENT_TYPE);
+        }
+        if (dynamic != Defaults.DYNAMIC) {
+            builder.field("dynamic", dynamic);
+        }
+        if (enabled != Defaults.ENABLED) {
+            builder.field("enabled", enabled);
+        }
+        if (pathType != Defaults.PATH_TYPE) {
+            builder.field("path", pathType.name().toLowerCase());
+        }
         if (includeInAll != null) {
             builder.field("include_in_all", includeInAll);
+        }
+
+        if (custom != null) {
+            custom.toXContent(builder, params);
         }
 
         doXContent(builder, params);

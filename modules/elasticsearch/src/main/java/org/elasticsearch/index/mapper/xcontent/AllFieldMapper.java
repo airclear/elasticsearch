@@ -29,7 +29,6 @@ import org.elasticsearch.common.lucene.all.AllField;
 import org.elasticsearch.common.lucene.all.AllTermQuery;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.index.analysis.NamedAnalyzer;
-import org.elasticsearch.index.mapper.DocumentMapper;
 import org.elasticsearch.index.mapper.MergeMappingException;
 
 import java.io.IOException;
@@ -118,14 +117,14 @@ public class AllFieldMapper extends AbstractFieldMapper<Void> implements org.ela
         // reset the entries
         context.allEntries().reset();
 
-        Analyzer analyzer = findAnalyzer(context.docMapper());
+        Analyzer analyzer = findAnalyzer(context);
         return new AllField(names.indexName(), store, termVector, context.allEntries(), analyzer);
     }
 
-    private Analyzer findAnalyzer(DocumentMapper docMapper) {
+    private Analyzer findAnalyzer(ParseContext context) {
         Analyzer analyzer = indexAnalyzer;
         if (analyzer == null) {
-            analyzer = docMapper.indexAnalyzer();
+            analyzer = context.analyzer();
             if (analyzer == null) {
                 analyzer = Lucene.STANDARD_ANALYZER;
             }
@@ -154,15 +153,30 @@ public class AllFieldMapper extends AbstractFieldMapper<Void> implements org.ela
     }
 
     @Override public void toXContent(XContentBuilder builder, Params params) throws IOException {
-        builder.startObject(CONTENT_TYPE);
-        builder.field("enabled", enabled);
-        builder.field("store", store.name().toLowerCase());
-        builder.field("term_vector", termVector.name().toLowerCase());
-        if (indexAnalyzer != null && !indexAnalyzer.name().startsWith("_")) {
-            builder.field("index_analyzer", indexAnalyzer.name());
+        // if all are defaults, no need to write it at all
+        if (enabled == Defaults.ENABLED && store == Defaults.STORE && termVector == Defaults.TERM_VECTOR && indexAnalyzer == null && searchAnalyzer == null) {
+            return;
         }
-        if (searchAnalyzer != null && !searchAnalyzer.name().startsWith("_")) {
-            builder.field("search_analyzer", searchAnalyzer.name());
+        builder.startObject(CONTENT_TYPE);
+        if (enabled != Defaults.ENABLED) {
+            builder.field("enabled", enabled);
+        }
+        if (store != Defaults.STORE) {
+            builder.field("store", store.name().toLowerCase());
+        }
+        if (termVector != Defaults.TERM_VECTOR) {
+            builder.field("term_vector", termVector.name().toLowerCase());
+        }
+        if (indexAnalyzer != null && searchAnalyzer != null && indexAnalyzer.name().equals(searchAnalyzer.name()) && !indexAnalyzer.name().startsWith("_")) {
+            // same analyzers, output it once
+            builder.field("analyzer", indexAnalyzer.name());
+        } else {
+            if (indexAnalyzer != null && !indexAnalyzer.name().startsWith("_")) {
+                builder.field("index_analyzer", indexAnalyzer.name());
+            }
+            if (searchAnalyzer != null && !searchAnalyzer.name().startsWith("_")) {
+                builder.field("search_analyzer", searchAnalyzer.name());
+            }
         }
         builder.endObject();
     }

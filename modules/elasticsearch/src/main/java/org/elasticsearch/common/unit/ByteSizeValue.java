@@ -123,15 +123,17 @@ public class ByteSizeValue implements Serializable, Streamable {
         return Strings.format1Decimals(value, suffix);
     }
 
+    public static ByteSizeValue parseBytesSizeValue(String sValue) throws ElasticSearchParseException {
+        return parseBytesSizeValue(sValue, null);
+    }
+
     public static ByteSizeValue parseBytesSizeValue(String sValue, ByteSizeValue defaultValue) throws ElasticSearchParseException {
         if (sValue == null) {
             return defaultValue;
         }
         long bytes;
         try {
-            if (sValue.endsWith("b")) {
-                bytes = Long.parseLong(sValue.substring(0, sValue.length() - 1));
-            } else if (sValue.endsWith("k") || sValue.endsWith("K")) {
+            if (sValue.endsWith("k") || sValue.endsWith("K")) {
                 bytes = (long) (Double.parseDouble(sValue.substring(0, sValue.length() - 1)) * ByteSizeUnit.C1);
             } else if (sValue.endsWith("kb")) {
                 bytes = (long) (Double.parseDouble(sValue.substring(0, sValue.length() - 2)) * ByteSizeUnit.C1);
@@ -143,6 +145,8 @@ public class ByteSizeValue implements Serializable, Streamable {
                 bytes = (long) (Double.parseDouble(sValue.substring(0, sValue.length() - 1)) * ByteSizeUnit.C3);
             } else if (sValue.endsWith("gb")) {
                 bytes = (long) (Double.parseDouble(sValue.substring(0, sValue.length() - 2)) * ByteSizeUnit.C3);
+            } else if (sValue.endsWith("b")) {
+                bytes = Long.parseLong(sValue.substring(0, sValue.length() - 1));
             } else {
                 bytes = Long.parseLong(sValue);
             }

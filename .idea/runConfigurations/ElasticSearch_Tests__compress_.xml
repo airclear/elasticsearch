@@ -1,7 +1,6 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="ElasticSearch Tests (compress)" type="TestNG" factoryName="TestNG">
     <extension name="coverage" enabled="false" merge="false" sample_coverage="true" runner="idea" />
-    <extension name="snapshooter" />
     <module name="" />
     <option name="ALTERNATIVE_JRE_PATH_ENABLED" value="false" />
     <option name="ALTERNATIVE_JRE_PATH" value="" />
@@ -11,7 +10,7 @@
     <option name="METHOD_NAME" value="" />
     <option name="GROUP_NAME" value="" />
     <option name="TEST_OBJECT" value="PACKAGE" />
-    <option name="VM_PARAMETERS" value="-Des.transport.tcp.compress=true -Xmx512m" />
+    <option name="VM_PARAMETERS" value="-Des.transport.tcp.compress=true -Xmx512m -Des.logger.prefix=" />
     <option name="PARAMETERS" value="" />
     <option name="WORKING_DIRECTORY" value="file://$PROJECT_DIR$" />
     <option name="OUTPUT_DIRECTORY" value="" />
@@ -34,7 +33,9 @@
     <RunnerSettings RunnerId="Profile ">
       <option name="myExternalizedOptions" value="&#10;additional-options2=onexit\=snapshot&#10;" />
     </RunnerSettings>
+    <RunnerSettings RunnerId="Run" />
     <ConfigurationWrapper RunnerId="Debug" />
+    <ConfigurationWrapper RunnerId="Run" />
     <method />
   </configuration>
 </component>

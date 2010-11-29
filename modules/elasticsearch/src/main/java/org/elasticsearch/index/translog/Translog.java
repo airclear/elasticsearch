@@ -20,7 +20,6 @@
 package org.elasticsearch.index.translog;
 
 import org.apache.lucene.index.Term;
-import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
@@ -31,7 +30,6 @@ import org.elasticsearch.common.util.concurrent.NotThreadSafe;
 import org.elasticsearch.common.util.concurrent.ThreadSafe;
 import org.elasticsearch.index.engine.Engine;
 import org.elasticsearch.index.shard.IndexShardComponent;
-import org.elasticsearch.index.shard.service.IndexShard;
 
 import javax.annotation.Nullable;
 import java.io.IOException;
@@ -86,6 +84,11 @@ public interface Translog extends IndexShardComponent {
      * has been take, will return a snapshot on the current trasnlog.
      */
     Snapshot snapshot(Snapshot snapshot);
+
+    /**
+     * Clears unreferenced transaclogs.
+     */
+    void clearUnreferenced();
 
     /**
      * Sync's the translog.
@@ -184,20 +187,20 @@ public interface Translog extends IndexShardComponent {
         Type opType();
 
         long estimateSize();
-
-        void execute(IndexShard indexShard) throws ElasticSearchException;
     }
 
     static class Create implements Operation {
         private String id;
         private String type;
         private byte[] source;
+        private String routing;
 
         public Create() {
         }
 
         public Create(Engine.Create create) {
             this(create.type(), create.id(), create.source());
+            this.routing = create.routing();
         }
 
         public Create(String type, String id, byte[] source) {
@@ -226,24 +229,35 @@ public interface Translog extends IndexShardComponent {
             return this.type;
         }
 
-        @Override public void execute(IndexShard indexShard) throws ElasticSearchException {
-            indexShard.create(type, id, source);
+        public String routing() {
+            return this.routing;
         }
 
         @Override public void readFrom(StreamInput in) throws IOException {
-            in.readVInt(); // version
+            int version = in.readVInt(); // version
             id = in.readUTF();
             type = in.readUTF();
             source = new byte[in.readVInt()];
             in.readFully(source);
+            if (version == 1) {
+                if (in.readBoolean()) {
+                    routing = in.readUTF();
+                }
+            }
         }
 
         @Override public void writeTo(StreamOutput out) throws IOException {
-            out.writeVInt(0); // version
+            out.writeVInt(1); // version
             out.writeUTF(id);
             out.writeUTF(type);
             out.writeVInt(source.length);
             out.writeBytes(source);
+            if (routing == null) {
+                out.writeBoolean(false);
+            } else {
+                out.writeBoolean(true);
+                out.writeUTF(routing);
+            }
         }
     }
 
@@ -251,12 +265,14 @@ public interface Translog extends IndexShardComponent {
         private String id;
         private String type;
         private byte[] source;
+        private String routing;
 
         public Index() {
         }
 
         public Index(Engine.Index index) {
             this(index.type(), index.id(), index.source());
+            this.routing = index.routing();
         }
 
         public Index(String type, String id, byte[] source) {
@@ -281,28 +297,39 @@ public interface Translog extends IndexShardComponent {
             return this.id;
         }
 
+        public String routing() {
+            return this.routing;
+        }
+
         public byte[] source() {
             return this.source;
         }
 
-        @Override public void execute(IndexShard indexShard) throws ElasticSearchException {
-            indexShard.index(type, id, source);
-        }
-
         @Override public void readFrom(StreamInput in) throws IOException {
-            in.readVInt(); // version
+            int version = in.readVInt(); // version
             id = in.readUTF();
             type = in.readUTF();
             source = new byte[in.readVInt()];
             in.readFully(source);
+            if (version == 1) {
+                if (in.readBoolean()) {
+                    routing = in.readUTF();
+                }
+            }
         }
 
         @Override public void writeTo(StreamOutput out) throws IOException {
-            out.writeVInt(0); // version
+            out.writeVInt(1); // version
             out.writeUTF(id);
             out.writeUTF(type);
             out.writeVInt(source.length);
             out.writeBytes(source);
+            if (routing == null) {
+                out.writeBoolean(false);
+            } else {
+                out.writeBoolean(true);
+                out.writeUTF(routing);
+            }
         }
     }
 
@@ -330,10 +357,6 @@ public interface Translog extends IndexShardComponent {
 
         public Term uid() {
             return this.uid;
-        }
-
-        @Override public void execute(IndexShard indexShard) throws ElasticSearchException {
-            indexShard.delete(uid);
         }
 
         @Override public void readFrom(StreamInput in) throws IOException {
@@ -384,10 +407,6 @@ public interface Translog extends IndexShardComponent {
 
         public String[] types() {
             return this.types;
-        }
-
-        @Override public void execute(IndexShard indexShard) throws ElasticSearchException {
-            indexShard.deleteByQuery(source, queryParserName, types);
         }
 
         @Override public void readFrom(StreamInput in) throws IOException {

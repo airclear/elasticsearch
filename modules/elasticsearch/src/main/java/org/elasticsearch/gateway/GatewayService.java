@@ -86,9 +86,9 @@ public class GatewayService extends AbstractLifecycleComponent<GatewayService> i
         this.recoverAfterNodes = componentSettings.getAsInt("recover_after_nodes", -1);
         this.expectedNodes = componentSettings.getAsInt("expected_nodes", -1);
         this.recoverAfterDataNodes = componentSettings.getAsInt("recover_after_data_nodes", -1);
-        this.expectedDataNodes = componentSettings.getAsInt("expected__data_nodes", -1);
+        this.expectedDataNodes = componentSettings.getAsInt("expected_data_nodes", -1);
         this.recoverAfterMasterNodes = componentSettings.getAsInt("recover_after_master_nodes", -1);
-        this.expectedMasterNodes = componentSettings.getAsInt("expected__master_nodes", -1);
+        this.expectedMasterNodes = componentSettings.getAsInt("expected_master_nodes", -1);
     }
 
     @Override protected void doStart() throws ElasticSearchException {
@@ -112,6 +112,9 @@ public class GatewayService extends AbstractLifecycleComponent<GatewayService> i
                     updateClusterStateBlockedOnNotRecovered();
                     logger.debug("not recovering from gateway, recover_after_time [{}]", recoverAfterTime);
                 } else {
+                    // first update the state that its blocked for not recovered, and then let recovery take its place
+                    // that way, we can wait till it is resolved
+                    updateClusterStateBlockedOnNotRecovered();
                     performStateRecovery(initialStateTimeout);
                 }
             }
@@ -178,6 +181,10 @@ public class GatewayService extends AbstractLifecycleComponent<GatewayService> i
                         if (indexRoutingTable != null && indexRoutingTable.allPrimaryShardsActive()) {
                             clusterService.submitStateUpdateTask("remove-index-block (all primary shards active for [" + index + "])", new ClusterStateUpdateTask() {
                                 @Override public ClusterState execute(ClusterState currentState) {
+                                    // check if the block was removed...
+                                    if (!currentState.blocks().hasIndexBlock(index, GatewayService.INDEX_NOT_RECOVERED_BLOCK)) {
+                                        return currentState;
+                                    }
                                     ClusterBlocks.Builder blocks = ClusterBlocks.builder().blocks(currentState.blocks());
                                     blocks.removeIndexBlock(index, GatewayService.INDEX_NOT_RECOVERED_BLOCK);
                                     return ClusterState.builder().state(currentState).blocks(blocks).build();

@@ -21,9 +21,8 @@ package org.elasticsearch.index.shard.service;
 
 import org.apache.lucene.document.Document;
 import org.apache.lucene.index.CheckIndex;
+import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.search.BooleanClause;
-import org.apache.lucene.search.FilterClause;
 import org.apache.lucene.search.FilteredQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.util.ThreadInterruptedException;
@@ -35,17 +34,13 @@ import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.FastByteArrayOutputStream;
 import org.elasticsearch.common.lucene.Lucene;
-import org.elasticsearch.common.lucene.search.XBooleanFilter;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.ByteSizeValue;
 import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.ThreadSafe;
 import org.elasticsearch.index.cache.IndexCache;
 import org.elasticsearch.index.engine.*;
-import org.elasticsearch.index.mapper.DocumentMapper;
-import org.elasticsearch.index.mapper.DocumentMapperNotFoundException;
-import org.elasticsearch.index.mapper.MapperService;
-import org.elasticsearch.index.mapper.ParsedDocument;
+import org.elasticsearch.index.mapper.*;
 import org.elasticsearch.index.query.IndexQueryParser;
 import org.elasticsearch.index.query.IndexQueryParserMissingException;
 import org.elasticsearch.index.query.IndexQueryParserService;
@@ -54,7 +49,6 @@ import org.elasticsearch.index.shard.*;
 import org.elasticsearch.index.shard.recovery.RecoveryStatus;
 import org.elasticsearch.index.store.Store;
 import org.elasticsearch.index.translog.Translog;
-import org.elasticsearch.indices.TypeMissingException;
 import org.elasticsearch.threadpool.ThreadPool;
 
 import javax.annotation.Nullable;
@@ -62,6 +56,8 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.channels.ClosedByInterruptException;
 import java.util.concurrent.ScheduledFuture;
+
+import static org.elasticsearch.index.mapper.SourceToParse.*;
 
 /**
  * @author kimchy (shay.banon)
@@ -188,10 +184,10 @@ public class InternalIndexShard extends AbstractIndexShardComponent implements I
             if (state == IndexShardState.RELOCATED) {
                 throw new IndexShardRelocatedException(shardId);
             }
-            engine.start();
             if (checkIndex) {
                 checkIndex(true);
             }
+            engine.start();
             scheduleRefresherIfNeeded();
             logger.debug("state: [{}]->[{}]", state, IndexShardState.STARTED);
             state = IndexShardState.STARTED;
@@ -211,17 +207,13 @@ public class InternalIndexShard extends AbstractIndexShardComponent implements I
         return engine.estimateFlushableMemorySize();
     }
 
-    @Override public Engine.Create prepareCreate(String type, String id, byte[] source) throws ElasticSearchException {
-        DocumentMapper docMapper = mapperService.type(type);
+    @Override public Engine.Create prepareCreate(SourceToParse source) throws ElasticSearchException {
+        DocumentMapper docMapper = mapperService.type(source.type());
         if (docMapper == null) {
-            throw new DocumentMapperNotFoundException("No mapper found for type [" + type + "]");
+            throw new DocumentMapperNotFoundException("No mapper found for type [" + source.type() + "]");
         }
-        ParsedDocument doc = docMapper.parse(type, id, source);
-        return new Engine.Create(doc, docMapper.mappers().indexAnalyzer());
-    }
-
-    @Override public ParsedDocument create(String type, String id, byte[] source) throws ElasticSearchException {
-        return create(prepareCreate(type, id, source));
+        ParsedDocument doc = docMapper.parse(source);
+        return new Engine.Create(doc);
     }
 
     @Override public ParsedDocument create(Engine.Create create) throws ElasticSearchException {
@@ -233,17 +225,13 @@ public class InternalIndexShard extends AbstractIndexShardComponent implements I
         return create.parsedDoc();
     }
 
-    @Override public Engine.Index prepareIndex(String type, String id, byte[] source) throws ElasticSearchException {
-        DocumentMapper docMapper = mapperService.type(type);
+    @Override public Engine.Index prepareIndex(SourceToParse source) throws ElasticSearchException {
+        DocumentMapper docMapper = mapperService.type(source.type());
         if (docMapper == null) {
-            throw new DocumentMapperNotFoundException("No mapper found for type [" + type + "]");
+            throw new DocumentMapperNotFoundException("No mapper found for type [" + source.type() + "]");
         }
-        ParsedDocument doc = docMapper.parse(type, id, source);
-        return new Engine.Index(docMapper.uidMapper().term(doc.uid()), doc, docMapper.mappers().indexAnalyzer());
-    }
-
-    @Override public ParsedDocument index(String type, String id, byte[] source) throws ElasticSearchException {
-        return index(prepareIndex(type, id, source));
+        ParsedDocument doc = docMapper.parse(source);
+        return new Engine.Index(docMapper.uidMapper().term(doc.uid()), doc);
     }
 
     @Override public ParsedDocument index(Engine.Index index) throws ElasticSearchException {
@@ -261,10 +249,6 @@ public class InternalIndexShard extends AbstractIndexShardComponent implements I
             throw new DocumentMapperNotFoundException("No mapper found for type [" + type + "]");
         }
         return new Engine.Delete(docMapper.uidMapper().term(type, id));
-    }
-
-    @Override public void delete(String type, String id) {
-        delete(prepareDelete(type, id));
     }
 
     @Override public void delete(Term uid) {
@@ -436,6 +420,10 @@ public class InternalIndexShard extends AbstractIndexShardComponent implements I
         if (state != IndexShardState.RECOVERING) {
             throw new IndexShardNotRecoveringException(shardId, state);
         }
+        // also check here, before we apply the translog
+        if (checkIndex) {
+            checkIndex(true);
+        }
         engine.start();
     }
 
@@ -455,15 +443,15 @@ public class InternalIndexShard extends AbstractIndexShardComponent implements I
         if (withFlush) {
             engine.flush(new Engine.Flush());
         }
-        if (checkIndex) {
-            checkIndex(true);
-        }
         synchronized (mutex) {
             logger.debug("state: [{}]->[{}]", state, IndexShardState.STARTED);
             state = IndexShardState.STARTED;
         }
         scheduleRefresherIfNeeded();
         engine.refresh(new Engine.Refresh(true));
+
+        // clear unreferenced files
+        translog.clearUnreferenced();
     }
 
     public void performRecoveryOperation(Translog.Operation operation) throws ElasticSearchException {
@@ -473,11 +461,11 @@ public class InternalIndexShard extends AbstractIndexShardComponent implements I
         switch (operation.opType()) {
             case CREATE:
                 Translog.Create create = (Translog.Create) operation;
-                engine.create(prepareCreate(create.type(), create.id(), create.source()));
+                engine.create(prepareCreate(source(create.source()).type(create.type()).id(create.id()).routing(create.routing())));
                 break;
             case SAVE:
                 Translog.Index index = (Translog.Index) operation;
-                engine.index(prepareIndex(index.type(), index.id(), index.source()));
+                engine.index(prepareIndex(source(index.source()).type(index.type()).id(index.id()).routing(index.routing())));
                 break;
             case DELETE:
                 Translog.Delete delete = (Translog.Delete) operation;
@@ -527,24 +515,7 @@ public class InternalIndexShard extends AbstractIndexShardComponent implements I
 
     private Query filterByTypesIfNeeded(Query query, String[] types) {
         if (types != null && types.length > 0) {
-            if (types.length == 1) {
-                String type = types[0];
-                DocumentMapper docMapper = mapperService.documentMapper(type);
-                if (docMapper == null) {
-                    throw new TypeMissingException(shardId.index(), type);
-                }
-                query = new FilteredQuery(query, indexCache.filter().cache(docMapper.typeFilter()));
-            } else {
-                XBooleanFilter booleanFilter = new XBooleanFilter();
-                for (String type : types) {
-                    DocumentMapper docMapper = mapperService.documentMapper(type);
-                    if (docMapper == null) {
-                        throw new TypeMissingException(shardId.index(), type);
-                    }
-                    booleanFilter.add(new FilterClause(indexCache.filter().cache(docMapper.typeFilter()), BooleanClause.Occur.SHOULD));
-                }
-                query = new FilteredQuery(query, booleanFilter);
-            }
+            query = new FilteredQuery(query, indexCache.filter().cache(mapperService.typesFilter(types)));
         }
         return query;
     }
@@ -573,6 +544,9 @@ public class InternalIndexShard extends AbstractIndexShardComponent implements I
 
     private void checkIndex(boolean throwException) throws IndexShardException {
         try {
+            if (!IndexReader.indexExists(store.directory())) {
+                return;
+            }
             CheckIndex checkIndex = new CheckIndex(store.directory());
             FastByteArrayOutputStream os = new FastByteArrayOutputStream();
             PrintStream out = new PrintStream(os);

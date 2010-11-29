@@ -21,10 +21,16 @@ package org.elasticsearch.index.mapper;
 
 import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
+import org.apache.lucene.document.Fieldable;
+import org.apache.lucene.index.Term;
+import org.apache.lucene.search.Filter;
+import org.apache.lucene.search.TermsFilter;
 import org.elasticsearch.common.collect.ImmutableMap;
+import org.elasticsearch.common.collect.Sets;
 import org.elasticsearch.common.collect.UnmodifiableIterator;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.io.Streams;
+import org.elasticsearch.common.regex.Regex;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.ThreadSafe;
 import org.elasticsearch.env.Environment;
@@ -34,6 +40,7 @@ import org.elasticsearch.index.Index;
 import org.elasticsearch.index.analysis.AnalysisService;
 import org.elasticsearch.index.mapper.xcontent.XContentDocumentMapperParser;
 import org.elasticsearch.index.settings.IndexSettings;
+import org.elasticsearch.indices.InvalidTypeNameException;
 
 import javax.annotation.Nullable;
 import java.io.File;
@@ -42,6 +49,8 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.util.Map;
+import java.util.Set;
 
 import static org.elasticsearch.common.collect.MapBuilder.*;
 
@@ -218,6 +227,20 @@ public class MapperService extends AbstractIndexComponent implements Iterable<Do
     }
 
     /**
+     * A filter to filter based on several types.
+     */
+    public Filter typesFilter(String... types) {
+        if (types.length == 1) {
+            return documentMapper(types[0]).typeFilter();
+        }
+        TermsFilter termsFilter = new TermsFilter();
+        for (String type : types) {
+            termsFilter.addTerm(new Term(TypeFieldMapper.NAME, type));
+        }
+        return termsFilter;
+    }
+
+    /**
      * Returns {@link FieldMappers} for all the {@link FieldMapper}s that are registered
      * under the given name across all the different {@link DocumentMapper} types.
      *
@@ -260,6 +283,44 @@ public class MapperService extends AbstractIndexComponent implements Iterable<Do
             return fieldMappers.mapper();
         }
         return null;
+    }
+
+    public Set<String> simpleMatchToIndexNames(String pattern) {
+        int dotIndex = pattern.indexOf('.');
+        if (dotIndex != -1) {
+            String possibleType = pattern.substring(0, dotIndex);
+            DocumentMapper possibleDocMapper = mappers.get(possibleType);
+            if (possibleDocMapper != null) {
+                Set<String> typedFields = Sets.newHashSet();
+                for (String indexName : possibleDocMapper.mappers().simpleMatchToIndexNames(pattern)) {
+                    typedFields.add(possibleType + "." + indexName);
+                }
+                return typedFields;
+            }
+        }
+        Set<String> fields = Sets.newHashSet();
+        for (Map.Entry<String, FieldMappers> entry : fullNameFieldMappers.entrySet()) {
+            if (Regex.simpleMatch(pattern, entry.getKey())) {
+                for (FieldMapper mapper : entry.getValue()) {
+                    fields.add(mapper.names().indexName());
+                }
+            }
+        }
+        for (Map.Entry<String, FieldMappers> entry : indexNameFieldMappers.entrySet()) {
+            if (Regex.simpleMatch(pattern, entry.getKey())) {
+                for (FieldMapper mapper : entry.getValue()) {
+                    fields.add(mapper.names().indexName());
+                }
+            }
+        }
+        for (Map.Entry<String, FieldMappers> entry : nameFieldMappers.entrySet()) {
+            if (Regex.simpleMatch(pattern, entry.getKey())) {
+                for (FieldMapper mapper : entry.getValue()) {
+                    fields.add(mapper.names().indexName());
+                }
+            }
+        }
+        return fields;
     }
 
     /**
@@ -380,12 +441,55 @@ public class MapperService extends AbstractIndexComponent implements Iterable<Do
         }
     }
 
-    private class SmartIndexNameSearchAnalyzer extends Analyzer {
+    class SmartIndexNameSearchAnalyzer extends Analyzer {
 
         private final Analyzer defaultAnalyzer;
 
-        private SmartIndexNameSearchAnalyzer(Analyzer defaultAnalyzer) {
+        SmartIndexNameSearchAnalyzer(Analyzer defaultAnalyzer) {
             this.defaultAnalyzer = defaultAnalyzer;
+        }
+
+        @Override public int getPositionIncrementGap(String fieldName) {
+            int dotIndex = fieldName.indexOf('.');
+            if (dotIndex != -1) {
+                String possibleType = fieldName.substring(0, dotIndex);
+                DocumentMapper possibleDocMapper = mappers.get(possibleType);
+                if (possibleDocMapper != null) {
+                    return possibleDocMapper.mappers().searchAnalyzer().getPositionIncrementGap(fieldName);
+                }
+            }
+            FieldMappers mappers = fullNameFieldMappers.get(fieldName);
+            if (mappers != null && mappers.mapper() != null && mappers.mapper().searchAnalyzer() != null) {
+                return mappers.mapper().searchAnalyzer().getPositionIncrementGap(fieldName);
+            }
+
+            mappers = indexNameFieldMappers.get(fieldName);
+            if (mappers != null && mappers.mapper() != null && mappers.mapper().searchAnalyzer() != null) {
+                return mappers.mapper().searchAnalyzer().getPositionIncrementGap(fieldName);
+            }
+            return defaultAnalyzer.getPositionIncrementGap(fieldName);
+        }
+
+        @Override public int getOffsetGap(Fieldable field) {
+            String fieldName = field.name();
+            int dotIndex = fieldName.indexOf('.');
+            if (dotIndex != -1) {
+                String possibleType = fieldName.substring(0, dotIndex);
+                DocumentMapper possibleDocMapper = mappers.get(possibleType);
+                if (possibleDocMapper != null) {
+                    return possibleDocMapper.mappers().searchAnalyzer().getOffsetGap(field);
+                }
+            }
+            FieldMappers mappers = fullNameFieldMappers.get(fieldName);
+            if (mappers != null && mappers.mapper() != null && mappers.mapper().searchAnalyzer() != null) {
+                return mappers.mapper().searchAnalyzer().getOffsetGap(field);
+            }
+
+            mappers = indexNameFieldMappers.get(fieldName);
+            if (mappers != null && mappers.mapper() != null && mappers.mapper().searchAnalyzer() != null) {
+                return mappers.mapper().searchAnalyzer().getOffsetGap(field);
+            }
+            return defaultAnalyzer.getOffsetGap(field);
         }
 
         @Override public TokenStream tokenStream(String fieldName, Reader reader) {
