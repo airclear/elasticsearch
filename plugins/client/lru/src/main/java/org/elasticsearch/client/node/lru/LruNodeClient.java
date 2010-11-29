@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.elasticsearch.plugin.lruclient;
+package org.elasticsearch.client.node.lru;
 
 import java.util.Collections;
 import java.util.Date;
@@ -62,7 +62,7 @@ import org.elasticsearch.index.shard.IndexShardState;
 import org.elasticsearch.indices.IndexMissingException;
 import org.elasticsearch.threadpool.ThreadPool;
 
-public class LruClient extends NodeClient {
+public class LruNodeClient extends NodeClient {
     
     private final ESLogger logger;
     private final Map cache;
@@ -86,7 +86,7 @@ public class LruClient extends NodeClient {
 
     }
 
-    @Inject public LruClient(Settings settings, ThreadPool threadPool, NodeAdminClient admin,
+    @Inject public LruNodeClient(Settings settings, ThreadPool threadPool, NodeAdminClient admin,
                               TransportIndexAction indexAction, TransportDeleteAction deleteAction, TransportBulkAction bulkAction,
                               TransportDeleteByQueryAction deleteByQueryAction, TransportGetAction getAction, TransportCountAction countAction,
                               TransportSearchAction searchAction, TransportSearchScrollAction searchScrollAction,

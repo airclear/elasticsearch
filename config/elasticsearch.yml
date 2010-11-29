@@ -1,6 +1,6 @@
 # use our LruIndex manager
 client:
- type: org.elasticsearch.plugin.lruclient.LruClient
+ type: lru
  lru:
     size: 10
 
