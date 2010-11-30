@@ -40,6 +40,6 @@ public class NodeClientModule extends AbstractModule {
         bind(ClusterAdminClient.class).to(NodeClusterAdminClient.class).asEagerSingleton();
         bind(IndicesAdminClient.class).to(NodeIndicesAdminClient.class).asEagerSingleton();
         bind(AdminClient.class).to(NodeAdminClient.class).asEagerSingleton();
-        bind(Client.class).to(settings.getAsClass("client.type", NodeClient.class, "org.elasticsearch.client.node", "Client")).asEagerSingleton();
+        bind(Client.class).to(settings.getAsClass("client.type", NodeClient.class, "org.elasticsearch.client.node.", "NodeClient")).asEagerSingleton();
     }
 }
