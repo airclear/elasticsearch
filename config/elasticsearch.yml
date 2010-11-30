@@ -17,3 +17,5 @@ index:
   numberOfReplicas: 0
   robin:
     refreshInterval: -1
+  store:
+    type: memory
