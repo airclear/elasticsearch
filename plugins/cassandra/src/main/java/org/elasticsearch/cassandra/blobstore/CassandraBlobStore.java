@@ -55,7 +55,9 @@ public class CassandraBlobStore extends AbstractComponent implements BlobStore {
         String host = settings.get("host", "localhost");
         int port = settings.getAsInt("port", 9160);
         hostAndPort = host + ':' + port;
-        cassandraClientFactory = new CassandraClientFactory(host, port);
+
+        int timeoutMillis = settings.getAsInt("timeout_seconds", 0) * 1000;
+        cassandraClientFactory = new CassandraClientFactory(host, port, timeoutMillis);
 
         this.executor = executor;
 
