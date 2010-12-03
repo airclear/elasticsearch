@@ -33,17 +33,19 @@ import org.apache.cassandra.thrift.Cassandra;
 class CassandraClientFactory {
     private final String host;
     private final int port;
+    private final int timeoutMillis;
 
-    public CassandraClientFactory(String host, int port) {
+    public CassandraClientFactory(String host, int port, int timeoutMillis) {
         this.host = host;
         this.port = port;
+        this.timeoutMillis = timeoutMillis;
     }
 
     public Cassandra.Client getCassandraClient()
         throws IOException
     {
         TTransport transport =
-            new TFramedTransport(new TSocket(host, port));
+            new TFramedTransport(new TSocket(host, port, timeoutMillis));
         TProtocol protocol = new TBinaryProtocol(transport);
         Cassandra.Client client = new Cassandra.Client(protocol);
         try {
