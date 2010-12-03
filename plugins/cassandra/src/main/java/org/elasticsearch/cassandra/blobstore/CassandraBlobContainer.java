@@ -126,21 +126,22 @@ class CassandraBlobContainer extends AbstractBlobContainer implements ImmutableB
     @Override public boolean blobExists(String blobName) {
         String blobKey = blobKey(blobName);
         logger.debug("TODO blobExists {}", blobKey);
+        Cassandra.Client client = null;
         try {
-            Cassandra.Client client =
-                cassandraClientFactory.getCassandraClient();
-            try {
-                return client.get_count(
-                    keyspace,
-                    blobKey,
-                    new ColumnParent("Blobs"),
-                    ConsistencyLevel.QUORUM) != 0;
-            }
-            finally {
+            client = cassandraClientFactory.getCassandraClient();
+            return client.get_count(
+                keyspace,
+                blobKey,
+                new ColumnParent("Blobs"),
+                ConsistencyLevel.QUORUM) != 0;
+        }
+        catch (Exception e) {
+            return false;
+        }
+        finally {
+            if (client != null) {
                 cassandraClientFactory.closeCassandraClient(client);
             }
-        } catch (Exception e) {
-            return false;
         }
     }
 
@@ -209,7 +210,10 @@ class CassandraBlobContainer extends AbstractBlobContainer implements ImmutableB
                 Cassandra.Client client = null;
                 try {
                     client = cassandraClientFactory.getCassandraClient();
-                    readBlob(client, blobKey, listener);
+                    byte[] blobData = readBlob(client, blobKey);
+                    logger.debug("Read {} bytes: {}", blobKey, blobData.length);
+                    listener.onPartial(blobData, 0, blobData.length);
+                    listener.onCompleted();
                 }
                 catch (Exception ex) {
                     listener.onFailure(ex);
@@ -223,7 +227,7 @@ class CassandraBlobContainer extends AbstractBlobContainer implements ImmutableB
         });
     }
 
-    private void readBlob(Cassandra.Client client, String blobKey, ReadBlobListener listener)
+    private byte[] readBlob(Cassandra.Client client, String blobKey)
         throws Exception
     {
         ColumnOrSuperColumn columnOrSuperColumn = client.get(
@@ -231,11 +235,7 @@ class CassandraBlobContainer extends AbstractBlobContainer implements ImmutableB
             blobKey,
             new ColumnPath("Blobs").setColumn(utf8.encode("data")),
             ConsistencyLevel.QUORUM);
-        Column column = columnOrSuperColumn.getColumn();
-        byte[] blobData = column.getValue();
-        logger.debug("Read {} bytes: {}", blobKey, blobData.length);
-        listener.onPartial(blobData, 0, blobData.length);
-        listener.onCompleted();
+        return columnOrSuperColumn.getColumn().getValue();
     }
 
     @Override public ImmutableMap<String, BlobMetaData> listBlobsByPrefix(@Nullable String blobNamePrefix) throws IOException {
@@ -317,18 +317,19 @@ class CassandraBlobContainer extends AbstractBlobContainer implements ImmutableB
         logger.debug("writeBlob {} sizeInBytes: {}", blobKey(blobName), sizeInBytes);
         executor.execute(new Runnable() {
             @Override public void run() {
+                Cassandra.Client client = null;
                 try {
-                    Cassandra.Client client =
-                        cassandraClientFactory.getCassandraClient();
-                    try {
-                        writeBlob(client, blobName, is, sizeInBytes);
-                        listener.onCompleted();
-                    }
-                    finally {
+                    client = cassandraClientFactory.getCassandraClient();
+                    writeBlob(client, blobName, is, sizeInBytes);
+                    listener.onCompleted();
+                }
+                catch (Exception e) {
+                    listener.onFailure(e);
+                }
+                finally {
+                    if (client != null) {
                         cassandraClientFactory.closeCassandraClient(client);
                     }
-                } catch (Exception e) {
-                    listener.onFailure(e);
                 }
             }
         });
