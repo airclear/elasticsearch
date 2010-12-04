@@ -19,12 +19,12 @@ import org.elasticsearch.indices.IndexMissingException;
  *
  * @author matt
  */
-public class LruIndexManager {
-    public static final int MAX_OPEN_RETRIES = 3;
+class LruIndexManager {
+    private static final int MAX_OPEN_RETRIES = 3;
 
-    private Map cache;
-    private NodeAdminClient admin;
     private final ESLogger logger = Loggers.getLogger(getClass());
+    private final Map cache;
+    private final NodeAdminClient admin;
 
     public LruIndexManager(int cache_size, NodeAdminClient admin) {
         this.cache = Collections.synchronizedMap(new LruCache(cache_size));

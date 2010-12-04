@@ -55,7 +55,7 @@ import org.elasticsearch.threadpool.ThreadPool;
 
 public class LruNodeClient extends NodeClient {
     
-    private final ESLogger logger;
+    private final ESLogger logger = Loggers.getLogger(getClass());
     private final LruIndexManager lru;
 
     @Inject public LruNodeClient(Settings settings, ThreadPool threadPool, NodeAdminClient admin,
@@ -64,7 +64,6 @@ public class LruNodeClient extends NodeClient {
                               TransportSearchAction searchAction, TransportSearchScrollAction searchScrollAction,
                               TransportMoreLikeThisAction moreLikeThisAction) {
         super(settings,threadPool,admin,indexAction,deleteAction,bulkAction,deleteByQueryAction,getAction,countAction,searchAction,searchScrollAction,moreLikeThisAction);
-        this.logger = Loggers.getLogger(getClass());
         this.lru = new LruIndexManager(settings.getAsInt("node.lrucache.size", 1), admin);
     }
 
