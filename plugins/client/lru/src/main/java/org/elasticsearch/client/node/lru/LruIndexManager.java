@@ -35,17 +35,17 @@ class LruIndexManager {
         public void perform();
     }
 
-    public interface AsyncIndexOperation {
-        public ActionFuture<? extends ActionResponse> perform();
+    public interface AsyncIndexOperation<T> {
+        public ActionFuture<T> perform();
     }
 
     
-    public ActionFuture<? extends ActionResponse> ensureOpen(final String index, AsyncIndexOperation op) {
-        return ensureOpenAndPerform(new String[]{index},op);
+    public <T> ActionFuture<T> ensureOpen(final String index, AsyncIndexOperation<T> op) {
+        return (ActionFuture<T>)ensureOpenAndPerform(new String[]{index},op);
     }
 
-    public ActionFuture<? extends ActionResponse> ensureOpen(final String [] indices, AsyncIndexOperation op) {
-        return ensureOpenAndPerform(indices,op);
+    public <T> ActionFuture<T> ensureOpen(final String [] indices, AsyncIndexOperation<T> op) {
+        return (ActionFuture<T>)ensureOpenAndPerform(indices,op);
     }
 
     public void ensureOpen(final String index, IndexOperation op) {

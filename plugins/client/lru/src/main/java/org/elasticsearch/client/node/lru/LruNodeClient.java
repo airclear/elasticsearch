@@ -80,7 +80,7 @@ public class LruNodeClient extends NodeClient {
 
     @Override public ActionFuture<DeleteResponse> delete(final DeleteRequest request) {
         logger.debug("delete");
-        return (ActionFuture<DeleteResponse>)lru.ensureOpen(request.index(), new LruIndexManager.AsyncIndexOperation() {
+        return lru.ensureOpen(request.index(), new LruIndexManager.AsyncIndexOperation<DeleteResponse>() {
             public ActionFuture<DeleteResponse> perform() {
                 return LruNodeClient.super.delete(request);
             }
@@ -98,7 +98,7 @@ public class LruNodeClient extends NodeClient {
 
     @Override public ActionFuture<BulkResponse> bulk(final BulkRequest request) {
         logger.debug("bulk");
-        return (ActionFuture<BulkResponse>)lru.ensureOpen(getIndices(request), new LruIndexManager.AsyncIndexOperation() {
+        return lru.ensureOpen(getIndices(request), new LruIndexManager.AsyncIndexOperation<BulkResponse>() {
             public ActionFuture<BulkResponse> perform() {
                 return LruNodeClient.super.bulk(request);
             }
@@ -118,7 +118,7 @@ public class LruNodeClient extends NodeClient {
 
     @Override public ActionFuture<DeleteByQueryResponse> deleteByQuery(final DeleteByQueryRequest request) {
         logger.debug("deleteByQuery");
-        return (ActionFuture<DeleteByQueryResponse>)lru.ensureOpen(request.indices(), new LruIndexManager.AsyncIndexOperation() {
+        return lru.ensureOpen(request.indices(), new LruIndexManager.AsyncIndexOperation<DeleteByQueryResponse>() {
             public ActionFuture<DeleteByQueryResponse> perform() {
                 return LruNodeClient.super.deleteByQuery(request);
             }
@@ -136,7 +136,7 @@ public class LruNodeClient extends NodeClient {
 
     @Override public ActionFuture<GetResponse> get(final GetRequest request) {
         logger.debug("get");
-        return (ActionFuture<GetResponse>)lru.ensureOpen(request.index(), new LruIndexManager.AsyncIndexOperation() {
+        return lru.ensureOpen(request.index(), new LruIndexManager.AsyncIndexOperation<GetResponse>() {
             public ActionFuture<GetResponse> perform() {
                 return LruNodeClient.super.get(request);
             }
@@ -155,7 +155,7 @@ public class LruNodeClient extends NodeClient {
 
     @Override public ActionFuture<CountResponse> count(final CountRequest request) {
         logger.debug("count");
-        return (ActionFuture<CountResponse>)lru.ensureOpen(request.indices(), new LruIndexManager.AsyncIndexOperation() {
+        return lru.ensureOpen(request.indices(), new LruIndexManager.AsyncIndexOperation<CountResponse>() {
             public ActionFuture<CountResponse> perform() {
                 return LruNodeClient.super.count(request);
             }
@@ -174,7 +174,7 @@ public class LruNodeClient extends NodeClient {
 
     @Override public ActionFuture<SearchResponse> search(final SearchRequest request) {
         logger.debug("search");
-        return (ActionFuture<SearchResponse>)lru.ensureOpen(request.indices(), new LruIndexManager.AsyncIndexOperation() {
+        return lru.ensureOpen(request.indices(), new LruIndexManager.AsyncIndexOperation<SearchResponse>() {
             public ActionFuture<SearchResponse> perform() {
                 return LruNodeClient.super.search(request);
             }
@@ -202,7 +202,7 @@ public class LruNodeClient extends NodeClient {
 
     @Override public ActionFuture<SearchResponse> moreLikeThis(final MoreLikeThisRequest request) {
         logger.debug("moreLikeThis");
-        return (ActionFuture<SearchResponse>)lru.ensureOpen(request.index(), new LruIndexManager.AsyncIndexOperation() {
+        return lru.ensureOpen(request.index(), new LruIndexManager.AsyncIndexOperation<SearchResponse>() {
             public ActionFuture<SearchResponse> perform() {
                 return LruNodeClient.super.moreLikeThis(request);
             }
