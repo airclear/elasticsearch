@@ -73,7 +73,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("index");
         lru.ensureOpen(request.index(),new LruIndexManager.IndexOperation() {
             public void perform() {
-                LruClient.super.index(request,listener);
+                LruNodeClient.super.index(request,listener);
             }
         });
             
@@ -83,7 +83,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("delete");
         return (ActionFuture<DeleteResponse>)lru.ensureOpen(request.index(), new LruIndexManager.AsyncIndexOperation() {
             public ActionFuture<DeleteResponse> perform() {
-                return LruClient.super.delete(request);
+                return LruNodeClient.super.delete(request);
             }
         });
     }
@@ -92,7 +92,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("delete");
         lru.ensureOpen(request.index(),new LruIndexManager.IndexOperation() {
             public void perform() {
-                LruClient.super.delete(request, listener);
+                LruNodeClient.super.delete(request, listener);
             }
         });
     }
@@ -101,7 +101,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("bulk");
         return (ActionFuture<BulkResponse>)lru.ensureOpen(getIndices(request), new LruIndexManager.AsyncIndexOperation() {
             public ActionFuture<BulkResponse> perform() {
-                return LruClient.super.bulk(request);
+                return LruNodeClient.super.bulk(request);
             }
         });
         
@@ -111,7 +111,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("bulk");
         lru.ensureOpen(getIndices(request),new LruIndexManager.IndexOperation() {
             public void perform() {
-                LruClient.super.bulk(request,listener);
+                LruNodeClient.super.bulk(request,listener);
             }
         });
         
@@ -121,7 +121,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("deleteByQuery");
         return (ActionFuture<DeleteByQueryResponse>)lru.ensureOpen(request.indices(), new LruIndexManager.AsyncIndexOperation() {
             public ActionFuture<DeleteByQueryResponse> perform() {
-                return LruClient.super.deleteByQuery(request);
+                return LruNodeClient.super.deleteByQuery(request);
             }
         });
     }
@@ -130,7 +130,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("deleteByQuery");
         lru.ensureOpen(request.indices(),new LruIndexManager.IndexOperation() {
             public void perform() {
-                LruClient.super.deleteByQuery(request,listener);
+                LruNodeClient.super.deleteByQuery(request,listener);
             }
         });
     }
@@ -139,7 +139,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("get");
         return (ActionFuture<GetResponse>)lru.ensureOpen(request.index(), new LruIndexManager.AsyncIndexOperation() {
             public ActionFuture<GetResponse> perform() {
-                return LruClient.super.get(request);
+                return LruNodeClient.super.get(request);
             }
         });
     }
@@ -148,7 +148,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("get");
         lru.ensureOpen(request.index(),new LruIndexManager.IndexOperation() {
             public void perform() {
-                LruClient.super.get(request, listener);
+                LruNodeClient.super.get(request, listener);
             }
         });
         
@@ -158,7 +158,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("count");
         return (ActionFuture<CountResponse>)lru.ensureOpen(request.indices(), new LruIndexManager.AsyncIndexOperation() {
             public ActionFuture<CountResponse> perform() {
-                return LruClient.super.count(request);
+                return LruNodeClient.super.count(request);
             }
         });
     }
@@ -167,7 +167,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("count");
         lru.ensureOpen(request.indices(),new LruIndexManager.IndexOperation() {
             public void perform() {
-                LruClient.super.count(request, listener);
+                LruNodeClient.super.count(request, listener);
             }
         });
         
@@ -177,7 +177,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("search");
         return (ActionFuture<SearchResponse>)lru.ensureOpen(request.indices(), new LruIndexManager.AsyncIndexOperation() {
             public ActionFuture<SearchResponse> perform() {
-                return LruClient.super.search(request);
+                return LruNodeClient.super.search(request);
             }
         });
     }
@@ -186,7 +186,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("search");
        lru.ensureOpen(request.indices(),new LruIndexManager.IndexOperation() {
             public void perform() {
-                LruClient.super.search(request, listener);
+                LruNodeClient.super.search(request, listener);
             }
         });
     }
@@ -205,7 +205,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("moreLikeThis");
         return (ActionFuture<SearchResponse>)lru.ensureOpen(request.index(), new LruIndexManager.AsyncIndexOperation() {
             public ActionFuture<SearchResponse> perform() {
-                return LruClient.super.moreLikeThis(request);
+                return LruNodeClient.super.moreLikeThis(request);
             }
         });
     }
@@ -214,7 +214,7 @@ public class LruNodeClient extends NodeClient {
         logger.debug("moreLikeThis");
                lru.ensureOpen(request.index(),new LruIndexManager.IndexOperation() {
             public void perform() {
-                LruClient.super.moreLikeThis(request, listener);
+                LruNodeClient.super.moreLikeThis(request, listener);
             }
         });
     }

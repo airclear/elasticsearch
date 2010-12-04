@@ -1,4 +1,4 @@
-package org.elasticsearch.plugin.lruclient;
+package org.elasticsearch.client.node.lru;
 
 import java.util.Collections;
 import java.util.Date;
