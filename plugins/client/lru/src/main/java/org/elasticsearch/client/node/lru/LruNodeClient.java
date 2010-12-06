@@ -64,7 +64,7 @@ public class LruNodeClient extends NodeClient {
                               TransportSearchAction searchAction, TransportSearchScrollAction searchScrollAction,
                               TransportMoreLikeThisAction moreLikeThisAction) {
         super(settings,threadPool,admin,indexAction,deleteAction,bulkAction,deleteByQueryAction,getAction,countAction,searchAction,searchScrollAction,moreLikeThisAction);
-        this.lru = new LruIndexManager(settings.getAsInt("node.lrucache.size", 1), admin);
+        this.lru = new LruIndexManager(settings.getAsInt("client.lru.size", 1), admin);
     }
 
 
