@@ -211,7 +211,7 @@ public class LruNodeClient extends NodeClient {
 
     @Override public void moreLikeThis(final MoreLikeThisRequest request, final ActionListener<SearchResponse> listener) {
         logger.debug("moreLikeThis");
-               lru.ensureOpen(request.index(),new LruIndexManager.IndexOperation() {
+        lru.ensureOpen(request.index(),new LruIndexManager.IndexOperation() {
             public void perform() {
                 LruNodeClient.super.moreLikeThis(request, listener);
             }
