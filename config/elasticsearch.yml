@@ -1,10 +1,10 @@
-# use our LruIndex manager
-client:
- type: lru
- lru:
-    size: 10
+network:
+  tcp:
+    keep_alive: true
 
-# make sure we store these somewhere as the LruClient closes them locally
+cluster:
+  name: development
+
 gateway:
   type: cassandra
   cassandra:
@@ -13,9 +13,15 @@ gateway:
     keyspace: ElasticSearch
 
 index:
-  numberOfShards: 1
-  numberOfReplicas: 0
-  robin:
-    refreshInterval: -1
   store:
     type: memory
+  number_of_shards: 1
+  number_of_replicas: 1
+  robin:
+    refreshInterval: -1
+
+# use our LruIndex manager
+client:
+  type: lru
+  lru:
+    size: 10
