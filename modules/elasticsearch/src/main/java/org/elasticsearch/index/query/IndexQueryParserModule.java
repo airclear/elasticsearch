@@ -220,11 +220,14 @@ public class IndexQueryParserModule extends AbstractModule {
 
     private static class DefaultQueryProcessors extends QueryParsersProcessor {
         @Override public void processXContentQueryParsers(XContentQueryParsersBindings bindings) {
+            bindings.processXContentQueryParser(HasChildQueryParser.NAME, HasChildQueryParser.class);
+            bindings.processXContentQueryParser(TopChildrenQueryParser.NAME, TopChildrenQueryParser.class);
             bindings.processXContentQueryParser(DisMaxQueryParser.NAME, DisMaxQueryParser.class);
             bindings.processXContentQueryParser(MatchAllQueryParser.NAME, MatchAllQueryParser.class);
             bindings.processXContentQueryParser(QueryStringQueryParser.NAME, QueryStringQueryParser.class);
             bindings.processXContentQueryParser(BoolQueryParser.NAME, BoolQueryParser.class);
             bindings.processXContentQueryParser(TermQueryParser.NAME, TermQueryParser.class);
+            bindings.processXContentQueryParser(TermsQueryParser.NAME, TermsQueryParser.class);
             bindings.processXContentQueryParser(FuzzyQueryParser.NAME, FuzzyQueryParser.class);
             bindings.processXContentQueryParser(FieldQueryParser.NAME, FieldQueryParser.class);
             bindings.processXContentQueryParser(RangeQueryParser.NAME, RangeQueryParser.class);
@@ -246,6 +249,7 @@ public class IndexQueryParserModule extends AbstractModule {
         }
 
         @Override public void processXContentFilterParsers(XContentFilterParsersBindings bindings) {
+            bindings.processXContentQueryFilter(HasChildFilterParser.NAME, HasChildFilterParser.class);
             bindings.processXContentQueryFilter(TermFilterParser.NAME, TermFilterParser.class);
             bindings.processXContentQueryFilter(TermsFilterParser.NAME, TermsFilterParser.class);
             bindings.processXContentQueryFilter(RangeFilterParser.NAME, RangeFilterParser.class);

@@ -34,7 +34,7 @@ import org.elasticsearch.cluster.action.shard.ShardStateAction;
 import org.elasticsearch.cluster.block.ClusterBlockLevel;
 import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.cluster.metadata.MetaData;
-import org.elasticsearch.cluster.routing.ShardsIterator;
+import org.elasticsearch.cluster.routing.ShardIterator;
 import org.elasticsearch.common.UUID;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
@@ -143,7 +143,7 @@ public class TransportIndexAction extends TransportShardReplicationOperationActi
         state.blocks().indexBlockedRaiseException(ClusterBlockLevel.WRITE, request.index());
     }
 
-    @Override protected ShardsIterator shards(ClusterState clusterState, IndexRequest request) {
+    @Override protected ShardIterator shards(ClusterState clusterState, IndexRequest request) {
         return clusterService.operationRouting()
                 .indexShards(clusterService.state(), request.index(), request.type(), request.id(), request.routing());
     }
@@ -160,7 +160,8 @@ public class TransportIndexAction extends TransportShardReplicationOperationActi
         }
 
         IndexShard indexShard = indexShard(shardRequest);
-        SourceToParse sourceToParse = SourceToParse.source(request.source()).type(request.type()).id(request.id()).routing(request.routing());
+        SourceToParse sourceToParse = SourceToParse.source(request.source()).type(request.type()).id(request.id())
+                .routing(request.routing()).parent(request.parent());
         ParsedDocument doc;
         if (request.opType() == IndexRequest.OpType.INDEX) {
             Engine.Index index = indexShard.prepareIndex(sourceToParse);
@@ -180,7 +181,8 @@ public class TransportIndexAction extends TransportShardReplicationOperationActi
     @Override protected void shardOperationOnReplica(ShardOperationRequest shardRequest) {
         IndexShard indexShard = indexShard(shardRequest);
         IndexRequest request = shardRequest.request;
-        SourceToParse sourceToParse = SourceToParse.source(request.source()).type(request.type()).id(request.id()).routing(request.routing());
+        SourceToParse sourceToParse = SourceToParse.source(request.source()).type(request.type()).id(request.id())
+                .routing(request.routing()).parent(request.parent());
         if (request.opType() == IndexRequest.OpType.INDEX) {
             Engine.Index index = indexShard.prepareIndex(sourceToParse);
             index.refresh(request.refresh());

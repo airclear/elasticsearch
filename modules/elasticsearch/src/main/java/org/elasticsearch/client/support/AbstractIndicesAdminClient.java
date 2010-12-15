@@ -20,6 +20,7 @@
 package org.elasticsearch.client.support;
 
 import org.elasticsearch.client.action.admin.indices.alias.IndicesAliasesRequestBuilder;
+import org.elasticsearch.client.action.admin.indices.analyze.AnalyzeRequestBuilder;
 import org.elasticsearch.client.action.admin.indices.cache.clear.ClearIndicesCacheRequestBuilder;
 import org.elasticsearch.client.action.admin.indices.close.CloseIndexRequestBuilder;
 import org.elasticsearch.client.action.admin.indices.create.CreateIndexRequestBuilder;
@@ -33,6 +34,8 @@ import org.elasticsearch.client.action.admin.indices.optimize.OptimizeRequestBui
 import org.elasticsearch.client.action.admin.indices.refresh.RefreshRequestBuilder;
 import org.elasticsearch.client.action.admin.indices.settings.UpdateSettingsRequestBuilder;
 import org.elasticsearch.client.action.admin.indices.status.IndicesStatusRequestBuilder;
+import org.elasticsearch.client.action.admin.indices.template.delete.DeleteIndexTemplateRequestBuilder;
+import org.elasticsearch.client.action.admin.indices.template.put.PutIndexTemplateRequestBuilder;
 import org.elasticsearch.client.internal.InternalIndicesAdminClient;
 
 /**
@@ -94,5 +97,17 @@ public abstract class AbstractIndicesAdminClient implements InternalIndicesAdmin
 
     @Override public UpdateSettingsRequestBuilder prepareUpdateSettings(String... indices) {
         return new UpdateSettingsRequestBuilder(this).setIndices(indices);
+    }
+
+    @Override public AnalyzeRequestBuilder prepareAnalyze(String index, String text) {
+        return new AnalyzeRequestBuilder(this, index, text);
+    }
+
+    @Override public PutIndexTemplateRequestBuilder preparePutTemplate(String name) {
+        return new PutIndexTemplateRequestBuilder(this, name);
+    }
+
+    @Override public DeleteIndexTemplateRequestBuilder prepareDeleteTemplate(String name) {
+        return new DeleteIndexTemplateRequestBuilder(this, name);
     }
 }

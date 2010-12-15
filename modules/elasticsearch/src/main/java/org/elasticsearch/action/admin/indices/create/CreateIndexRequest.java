@@ -23,6 +23,7 @@ import org.elasticsearch.ElasticSearchGenerationException;
 import org.elasticsearch.ElasticSearchIllegalArgumentException;
 import org.elasticsearch.action.ActionRequestValidationException;
 import org.elasticsearch.action.support.master.MasterNodeOperationRequest;
+import org.elasticsearch.common.collect.MapBuilder;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.settings.ImmutableSettings;
@@ -190,6 +191,10 @@ public class CreateIndexRequest extends MasterNodeOperationRequest {
      * @param source The mapping source
      */
     public CreateIndexRequest mapping(String type, Map source) {
+        // wrap it in a type map if its not
+        if (source.size() != 1 || !source.containsKey(type)) {
+            source = MapBuilder.<String, Object>newMapBuilder().put(type, source).map();
+        }
         try {
             XContentBuilder builder = XContentFactory.contentBuilder(XContentType.JSON);
             builder.map(source);

@@ -34,7 +34,7 @@ import org.elasticsearch.cluster.ClusterService;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.metadata.MappingMetaData;
 import org.elasticsearch.cluster.routing.GroupShardsIterator;
-import org.elasticsearch.cluster.routing.ShardsIterator;
+import org.elasticsearch.cluster.routing.ShardIterator;
 import org.elasticsearch.common.UUID;
 import org.elasticsearch.common.collect.Lists;
 import org.elasticsearch.common.collect.Maps;
@@ -187,11 +187,11 @@ public class TransportBulkAction extends BaseAction<BulkRequest, BulkResponse> {
                 if (mappingMd != null && mappingMd.routing().required() && deleteRequest.routing() == null) {
                     // if routing is required, and no routing on the delete request, we need to broadcast it....
                     GroupShardsIterator groupShards = clusterService.operationRouting().broadcastDeleteShards(clusterState, deleteRequest.index());
-                    for (ShardsIterator shardsId : groupShards) {
-                        List<BulkItemRequest> list = requestsByShard.get(shardsId.shardId());
+                    for (ShardIterator shardIt : groupShards) {
+                        List<BulkItemRequest> list = requestsByShard.get(shardIt.shardId());
                         if (list == null) {
                             list = Lists.newArrayList();
-                            requestsByShard.put(shardsId.shardId(), list);
+                            requestsByShard.put(shardIt.shardId(), list);
                         }
                         list.add(new BulkItemRequest(i, request));
                     }
@@ -211,7 +211,7 @@ public class TransportBulkAction extends BaseAction<BulkRequest, BulkResponse> {
         for (Map.Entry<ShardId, List<BulkItemRequest>> entry : requestsByShard.entrySet()) {
             final ShardId shardId = entry.getKey();
             final List<BulkItemRequest> requests = entry.getValue();
-            BulkShardRequest bulkShardRequest = new BulkShardRequest(shardId.index().name(), shardId.id(), requests.toArray(new BulkItemRequest[requests.size()]));
+            BulkShardRequest bulkShardRequest = new BulkShardRequest(shardId.index().name(), shardId.id(), bulkRequest.refresh(), requests.toArray(new BulkItemRequest[requests.size()]));
             bulkShardRequest.replicationType(bulkRequest.replicationType());
             bulkShardRequest.consistencyLevel(bulkRequest.consistencyLevel());
             shardBulkAction.execute(bulkShardRequest, new ActionListener<BulkShardResponse>() {

@@ -52,6 +52,7 @@ public class BulkRequest implements ActionRequest {
 
     private ReplicationType replicationType = ReplicationType.DEFAULT;
     private WriteConsistencyLevel consistencyLevel = WriteConsistencyLevel.DEFAULT;
+    private boolean refresh = false;
 
     /**
      * Adds an {@link IndexRequest} to the list of actions to execute. Follows the same behavior of {@link IndexRequest}
@@ -109,6 +110,7 @@ public class BulkRequest implements ActionRequest {
             String type = null;
             String id = null;
             String routing = null;
+            String parent = null;
             String opType = null;
 
             String currentFieldName = null;
@@ -124,6 +126,8 @@ public class BulkRequest implements ActionRequest {
                         id = parser.text();
                     } else if ("_routing".equals(currentFieldName)) {
                         routing = parser.text();
+                    } else if ("_parent".equals(currentFieldName)) {
+                        parent = parser.text();
                     } else if ("op_type".equals(currentFieldName) || "opType".equals(currentFieldName)) {
                         opType = parser.text();
                     }
@@ -137,17 +141,18 @@ public class BulkRequest implements ActionRequest {
                 if (nextMarker == -1) {
                     break;
                 }
+                // order is important, we set parent after routing, so routing will be set to parent if not set explicitly
                 if ("index".equals(action)) {
                     if (opType == null) {
-                        add(new IndexRequest(index, type, id).routing(routing)
+                        add(new IndexRequest(index, type, id).routing(routing).parent(parent)
                                 .source(data, from, nextMarker - from, contentUnsafe));
                     } else {
-                        add(new IndexRequest(index, type, id).routing(routing)
+                        add(new IndexRequest(index, type, id).routing(routing).parent(parent)
                                 .create("create".equals(opType))
                                 .source(data, from, nextMarker - from, contentUnsafe));
                     }
                 } else if ("create".equals(action)) {
-                    add(new IndexRequest(index, type, id).routing(routing)
+                    add(new IndexRequest(index, type, id).routing(routing).parent(parent)
                             .create(true)
                             .source(data, from, nextMarker - from, contentUnsafe));
                 }
@@ -168,6 +173,20 @@ public class BulkRequest implements ActionRequest {
 
     public WriteConsistencyLevel consistencyLevel() {
         return this.consistencyLevel;
+    }
+
+    /**
+     * Should a refresh be executed post this bulk operation causing the operations to
+     * be searchable. Note, heavy indexing should not set this to <tt>true</tt>. Defaults
+     * to <tt>false</tt>.
+     */
+    public BulkRequest refresh(boolean refresh) {
+        this.refresh = refresh;
+        return this;
+    }
+
+    public boolean refresh() {
+        return this.refresh;
     }
 
     /**
@@ -238,6 +257,7 @@ public class BulkRequest implements ActionRequest {
                 requests.add(request);
             }
         }
+        refresh = in.readBoolean();
     }
 
     @Override public void writeTo(StreamOutput out) throws IOException {
@@ -252,5 +272,6 @@ public class BulkRequest implements ActionRequest {
             }
             request.writeTo(out);
         }
+        out.writeBoolean(refresh);
     }
 }

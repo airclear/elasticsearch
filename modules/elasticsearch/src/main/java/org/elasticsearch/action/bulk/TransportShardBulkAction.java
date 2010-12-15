@@ -33,7 +33,7 @@ import org.elasticsearch.cluster.action.index.MappingUpdatedAction;
 import org.elasticsearch.cluster.action.shard.ShardStateAction;
 import org.elasticsearch.cluster.block.ClusterBlockLevel;
 import org.elasticsearch.cluster.metadata.MappingMetaData;
-import org.elasticsearch.cluster.routing.ShardsIterator;
+import org.elasticsearch.cluster.routing.ShardIterator;
 import org.elasticsearch.common.collect.Sets;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.common.settings.Settings;
@@ -93,7 +93,7 @@ public class TransportShardBulkAction extends TransportShardReplicationOperation
         state.blocks().indexBlockedRaiseException(ClusterBlockLevel.WRITE, request.index());
     }
 
-    @Override protected ShardsIterator shards(ClusterState clusterState, BulkShardRequest request) {
+    @Override protected ShardIterator shards(ClusterState clusterState, BulkShardRequest request) {
         return clusterState.routingTable().index(request.index()).shard(request.shardId()).shardsIt();
     }
 
@@ -116,13 +116,17 @@ public class TransportShardBulkAction extends TransportShardReplicationOperation
                         }
                     }
 
-                    SourceToParse sourceToParse = SourceToParse.source(indexRequest.source()).type(indexRequest.type()).id(indexRequest.id()).routing(indexRequest.routing());
+                    SourceToParse sourceToParse = SourceToParse.source(indexRequest.source()).type(indexRequest.type()).id(indexRequest.id())
+                            .routing(indexRequest.routing()).parent(indexRequest.parent());
                     if (indexRequest.opType() == IndexRequest.OpType.INDEX) {
                         ops[i] = indexShard.prepareIndex(sourceToParse);
                     } else {
                         ops[i] = indexShard.prepareCreate(sourceToParse);
                     }
                 } catch (Exception e) {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("[" + shardRequest.request.index() + "][" + shardRequest.shardId + "]" + ": Failed to execute bulk item (index) [" + indexRequest + "]", e);
+                    }
                     responses[i] = new BulkItemResponse(item.id(), indexRequest.opType().toString().toLowerCase(),
                             new BulkItemResponse.Failure(indexRequest.index(), indexRequest.type(), indexRequest.id(), ExceptionsHelper.detailedMessage(e)));
                 }
@@ -131,13 +135,16 @@ public class TransportShardBulkAction extends TransportShardReplicationOperation
                 try {
                     ops[i] = indexShard.prepareDelete(deleteRequest.type(), deleteRequest.id());
                 } catch (Exception e) {
+                    if (logger.isDebugEnabled()) {
+                        logger.debug("[" + shardRequest.request.index() + "][" + shardRequest.shardId + "]" + ": Failed to execute bulk item (delete) [" + deleteRequest + "]", e);
+                    }
                     responses[i] = new BulkItemResponse(item.id(), "delete",
                             new BulkItemResponse.Failure(deleteRequest.index(), deleteRequest.type(), deleteRequest.id(), ExceptionsHelper.detailedMessage(e)));
                 }
             }
         }
 
-        EngineException[] failures = indexShard.bulk(new Engine.Bulk(ops));
+        EngineException[] failures = indexShard.bulk(new Engine.Bulk(ops).refresh(request.refresh()));
         // process failures and mappings
         Set<String> processedTypes = Sets.newHashSet();
         for (int i = 0; i < ops.length; i++) {
@@ -198,7 +205,8 @@ public class TransportShardBulkAction extends TransportShardReplicationOperation
             if (item.request() instanceof IndexRequest) {
                 IndexRequest indexRequest = (IndexRequest) item.request();
                 try {
-                    SourceToParse sourceToParse = SourceToParse.source(indexRequest.source()).type(indexRequest.type()).id(indexRequest.id()).routing(indexRequest.routing());
+                    SourceToParse sourceToParse = SourceToParse.source(indexRequest.source()).type(indexRequest.type()).id(indexRequest.id())
+                            .routing(indexRequest.routing()).parent(indexRequest.parent());
                     if (indexRequest.opType() == IndexRequest.OpType.INDEX) {
                         ops[i] = indexShard.prepareIndex(sourceToParse);
                     } else {

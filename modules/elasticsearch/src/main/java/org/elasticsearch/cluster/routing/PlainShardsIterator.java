@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -19,8 +19,6 @@
 
 package org.elasticsearch.cluster.routing;
 
-import org.elasticsearch.index.shard.ShardId;
-
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
@@ -30,59 +28,70 @@ import java.util.NoSuchElementException;
  */
 public class PlainShardsIterator implements ShardsIterator {
 
-    private final ShardId shardId;
+    protected final List<ShardRouting> shards;
 
-    private final List<ShardRouting> shards;
+    private final int origIndex;
+
+    private volatile int index;
 
     private volatile int counter = 0;
 
-    public PlainShardsIterator(ShardId shardId, List<ShardRouting> shards) {
-        this.shardId = shardId;
+    public PlainShardsIterator(List<ShardRouting> shards) {
+        this(shards, 0);
+    }
+
+    public PlainShardsIterator(List<ShardRouting> shards, int index) {
         this.shards = shards;
-    }
-
-    @Override public ShardsIterator reset() {
-        this.counter = 0;
-        return this;
-    }
-
-    @Override public int size() {
-        return shards.size();
-    }
-
-    @Override public ShardId shardId() {
-        return this.shardId;
+        this.index = Math.abs(index);
+        this.origIndex = this.index;
     }
 
     @Override public Iterator<ShardRouting> iterator() {
         return this;
     }
 
-    @Override public boolean hasNext() {
-        return counter < shards.size();
+    @Override public ShardsIterator reset() {
+        counter = 0;
+        index = origIndex;
+        return this;
     }
 
-    @Override public ShardRouting next() {
+    @Override public boolean hasNext() {
+        return counter < size();
+    }
+
+    @Override public ShardRouting next() throws NoSuchElementException {
         if (!hasNext()) {
             throw new NoSuchElementException("No shard found");
         }
-        return shards.get(counter++);
+        counter++;
+        return shardModulo(index++);
+    }
+
+    @Override public void remove() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override public int size() {
+        return shards.size();
     }
 
     @Override public int sizeActive() {
-        int sizeActive = 0;
+        int shardsActive = 0;
         for (ShardRouting shardRouting : shards) {
             if (shardRouting.active()) {
-                sizeActive++;
+                shardsActive++;
             }
         }
-        return sizeActive;
+        return shardsActive;
     }
 
     @Override public boolean hasNextActive() {
         int counter = this.counter;
-        while (counter < shards.size()) {
-            if (shards.get(counter++).active()) {
+        int index = this.index;
+        while (counter++ < size()) {
+            ShardRouting shardRouting = shardModulo(index++);
+            if (shardRouting.active()) {
                 return true;
             }
         }
@@ -98,29 +107,37 @@ public class PlainShardsIterator implements ShardsIterator {
     }
 
     @Override public ShardRouting nextActiveOrNull() throws NoSuchElementException {
-        while (counter < shards.size()) {
-            ShardRouting shardRouting = shards.get(counter++);
+        int counter = this.counter;
+        int index = this.index;
+        while (counter++ < size()) {
+            ShardRouting shardRouting = shardModulo(index++);
             if (shardRouting.active()) {
+                this.counter = counter;
+                this.index = index;
                 return shardRouting;
             }
         }
+        this.counter = counter;
+        this.index = index;
         return null;
     }
 
     @Override public int sizeAssigned() {
-        int sizeAssigned = 0;
+        int shardsAssigned = 0;
         for (ShardRouting shardRouting : shards) {
             if (shardRouting.assignedToNode()) {
-                sizeAssigned++;
+                shardsAssigned++;
             }
         }
-        return sizeAssigned;
+        return shardsAssigned;
     }
 
     @Override public boolean hasNextAssigned() {
         int counter = this.counter;
-        while (counter < shards.size()) {
-            if (shards.get(counter++).assignedToNode()) {
+        int index = this.index;
+        while (counter++ < size()) {
+            ShardRouting shardRouting = shardModulo(index++);
+            if (shardRouting.assignedToNode()) {
                 return true;
             }
         }
@@ -136,30 +153,22 @@ public class PlainShardsIterator implements ShardsIterator {
     }
 
     @Override public ShardRouting nextAssignedOrNull() {
-        while (counter < shards.size()) {
-            ShardRouting shardRouting = shards.get(counter++);
+        int counter = this.counter;
+        int index = this.index;
+        while (counter++ < size()) {
+            ShardRouting shardRouting = shardModulo(index++);
             if (shardRouting.assignedToNode()) {
+                this.counter = counter;
+                this.index = index;
                 return shardRouting;
             }
         }
+        this.counter = counter;
+        this.index = index;
         return null;
     }
 
-    @Override public void remove() {
-        throw new UnsupportedOperationException();
-    }
-
-    @Override public boolean equals(Object o) {
-        if (this == o) return true;
-
-        ShardsIterator that = (ShardsIterator) o;
-
-        if (shardId != null ? !shardId.equals(that.shardId()) : that.shardId() != null) return false;
-
-        return true;
-    }
-
-    @Override public int hashCode() {
-        return shardId != null ? shardId.hashCode() : 0;
+    ShardRouting shardModulo(int counter) {
+        return shards.get((counter % size()));
     }
 }

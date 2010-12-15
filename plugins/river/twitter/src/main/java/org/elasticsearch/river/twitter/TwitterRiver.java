@@ -69,6 +69,7 @@ public class TwitterRiver extends AbstractRiverComponent implements River {
 
     private volatile BulkRequestBuilder currentRequest;
 
+    @SuppressWarnings({"unchecked"})
     @Inject public TwitterRiver(RiverName riverName, RiverSettings settings, Client client) {
         super(riverName, settings);
         this.client = client;
@@ -225,7 +226,7 @@ public class TwitterRiver extends AbstractRiverComponent implements River {
     @Override public void close() {
         logger.info("closing twitter stream river");
         if (stream != null) {
-            stream.cleanup();
+            stream.cleanUp();
             stream.shutdown();
         }
     }

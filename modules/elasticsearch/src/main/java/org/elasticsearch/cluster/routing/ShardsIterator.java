@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -19,22 +19,15 @@
 
 package org.elasticsearch.cluster.routing;
 
-import org.elasticsearch.index.shard.ShardId;
-
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 /**
- * Allows to iterate over a set of shard instances (routing) within a shard id group.
+ * Allows to iterate over unrelated shards.
  *
  * @author kimchy (shay.banon)
  */
 public interface ShardsIterator extends Iterable<ShardRouting>, Iterator<ShardRouting> {
-
-    /**
-     * The shard id this group relates to.
-     */
-    ShardId shardId();
 
     /**
      * Resets the iterator.
@@ -106,3 +99,4 @@ public interface ShardsIterator extends Iterable<ShardRouting>, Iterator<ShardRo
 
     boolean equals(Object other);
 }
+

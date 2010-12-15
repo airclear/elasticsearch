@@ -163,14 +163,14 @@ public class TransportSearchDfsQueryAndFetchAction extends TransportSearchTypeAc
             }
         }
 
-        private void innerFinishHim() {
+        private void innerFinishHim() throws Exception {
             sortedShardList = searchPhaseController.sortDocs(queryFetchResults.values());
             final InternalSearchResponse internalResponse = searchPhaseController.merge(sortedShardList, queryFetchResults, queryFetchResults);
             String scrollId = null;
             if (request.scroll() != null) {
                 scrollId = buildScrollId(request.searchType(), dfsResults);
             }
-            invokeListener(new SearchResponse(internalResponse, scrollId, expectedSuccessfulOps, successulOps.get(), buildShardFailures()));
+            invokeListener(new SearchResponse(internalResponse, scrollId, expectedSuccessfulOps, successulOps.get(), buildTookInMillis(), buildShardFailures()));
         }
     }
 }

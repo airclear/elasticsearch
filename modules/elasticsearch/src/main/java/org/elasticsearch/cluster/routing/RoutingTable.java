@@ -145,7 +145,7 @@ public class RoutingTable implements Iterable<IndexRoutingTable> {
      */
     public GroupShardsIterator allShardsGrouped(String... indices) throws IndexMissingException {
         // use list here since we need to maintain identity across shards
-        ArrayList<ShardsIterator> set = new ArrayList<ShardsIterator>();
+        ArrayList<ShardIterator> set = new ArrayList<ShardIterator>();
         if (indices == null || indices.length == 0) {
             indices = indicesRouting.keySet().toArray(new String[indicesRouting.keySet().size()]);
         }
@@ -177,7 +177,7 @@ public class RoutingTable implements Iterable<IndexRoutingTable> {
      */
     public GroupShardsIterator primaryShardsGrouped(String... indices) throws IndexMissingException {
         // use list here since we need to maintain identity across shards
-        ArrayList<ShardsIterator> set = new ArrayList<ShardsIterator>();
+        ArrayList<ShardIterator> set = new ArrayList<ShardIterator>();
         if (indices == null || indices.length == 0) {
             indices = indicesRouting.keySet().toArray(new String[indicesRouting.keySet().size()]);
         }
@@ -277,7 +277,9 @@ public class RoutingTable implements Iterable<IndexRoutingTable> {
                         indexBuilder = new IndexRoutingTable.Builder(index);
                         indexRoutingTableBuilders.put(index, indexBuilder);
                     }
-                    indexBuilder.addShard(new ImmutableShardRouting(shardRoutingEntry));
+
+                    boolean allocatedPostApi = routingNodes.routingTable().index(shardRoutingEntry.index()).shard(shardRoutingEntry.id()).allocatedPostApi();
+                    indexBuilder.addShard(new ImmutableShardRouting(shardRoutingEntry), !allocatedPostApi);
                 }
             }
             for (MutableShardRouting shardRoutingEntry : Iterables.concat(routingNodes.unassigned(), routingNodes.ignoredUnassigned())) {
@@ -287,7 +289,8 @@ public class RoutingTable implements Iterable<IndexRoutingTable> {
                     indexBuilder = new IndexRoutingTable.Builder(index);
                     indexRoutingTableBuilders.put(index, indexBuilder);
                 }
-                indexBuilder.addShard(new ImmutableShardRouting(shardRoutingEntry));
+                boolean allocatedPostApi = routingNodes.routingTable().index(shardRoutingEntry.index()).shard(shardRoutingEntry.id()).allocatedPostApi();
+                indexBuilder.addShard(new ImmutableShardRouting(shardRoutingEntry), !allocatedPostApi);
             }
             for (IndexRoutingTable.Builder indexBuilder : indexRoutingTableBuilders.values()) {
                 add(indexBuilder);

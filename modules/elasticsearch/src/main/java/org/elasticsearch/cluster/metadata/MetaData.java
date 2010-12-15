@@ -23,13 +23,11 @@ import org.elasticsearch.ElasticSearchIllegalArgumentException;
 import org.elasticsearch.common.collect.*;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
-import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.Immutable;
 import org.elasticsearch.common.xcontent.*;
 import org.elasticsearch.index.Index;
 import org.elasticsearch.indices.IndexMissingException;
 
-import javax.annotation.Nullable;
 import java.io.IOException;
 import java.util.*;
 
@@ -45,6 +43,7 @@ public class MetaData implements Iterable<IndexMetaData> {
     public static MetaData EMPTY_META_DATA = newMetaDataBuilder().build();
 
     private final ImmutableMap<String, IndexMetaData> indices;
+    private final ImmutableMap<String, IndexTemplateMetaData> templates;
 
     private final transient int totalNumberOfShards;
     private final boolean recoveredFromGateway;
@@ -56,8 +55,9 @@ public class MetaData implements Iterable<IndexMetaData> {
     private final ImmutableMap<String, String[]> aliasAndIndexToIndexMap;
     private final ImmutableMap<String, ImmutableSet<String>> aliasAndIndexToIndexMap2;
 
-    private MetaData(ImmutableMap<String, IndexMetaData> indices, boolean recoveredFromGateway) {
+    private MetaData(ImmutableMap<String, IndexMetaData> indices, ImmutableMap<String, IndexTemplateMetaData> templates, boolean recoveredFromGateway) {
         this.indices = ImmutableMap.copyOf(indices);
+        this.templates = templates;
         this.recoveredFromGateway = recoveredFromGateway;
         int totalNumberOfShards = 0;
         for (IndexMetaData indexMetaData : indices.values()) {
@@ -138,10 +138,14 @@ public class MetaData implements Iterable<IndexMetaData> {
         return concreteAllIndices();
     }
 
+    public String[] concreteIndices(String[] indices) throws IndexMissingException {
+        return concreteIndices(indices, false);
+    }
+
     /**
      * Translates the provided indices (possibly aliased) into actual indices.
      */
-    public String[] concreteIndices(String[] indices) throws IndexMissingException {
+    public String[] concreteIndices(String[] indices, boolean ignoreMissing) throws IndexMissingException {
         if (indices == null || indices.length == 0) {
             return concreteAllIndices();
         }
@@ -158,10 +162,13 @@ public class MetaData implements Iterable<IndexMetaData> {
         for (String index : indices) {
             String[] actualLst = aliasAndIndexToIndexMap.get(index);
             if (actualLst == null) {
-                throw new IndexMissingException(new Index(index));
-            }
-            for (String x : actualLst) {
-                actualIndices.add(x);
+                if (!ignoreMissing) {
+                    throw new IndexMissingException(new Index(index));
+                }
+            } else {
+                for (String x : actualLst) {
+                    actualIndices.add(x);
+                }
             }
         }
         return actualIndices.toArray(new String[actualIndices.size()]);
@@ -203,6 +210,14 @@ public class MetaData implements Iterable<IndexMetaData> {
         return indices();
     }
 
+    public ImmutableMap<String, IndexTemplateMetaData> templates() {
+        return this.templates;
+    }
+
+    public ImmutableMap<String, IndexTemplateMetaData> getTemplates() {
+        return this.templates;
+    }
+
     public int totalNumberOfShards() {
         return this.totalNumberOfShards;
     }
@@ -228,7 +243,16 @@ public class MetaData implements Iterable<IndexMetaData> {
 
         private MapBuilder<String, IndexMetaData> indices = newMapBuilder();
 
+        private MapBuilder<String, IndexTemplateMetaData> templates = newMapBuilder();
+
         private boolean recoveredFromGateway = false;
+
+        public Builder metaData(MetaData metaData) {
+            this.indices.putAll(metaData.indices);
+            this.templates.putAll(metaData.templates);
+            this.recoveredFromGateway = metaData.recoveredFromGateway();
+            return this;
+        }
 
         public Builder put(IndexMetaData.Builder indexMetaDataBuilder) {
             return put(indexMetaDataBuilder.build());
@@ -248,9 +272,17 @@ public class MetaData implements Iterable<IndexMetaData> {
             return this;
         }
 
-        public Builder metaData(MetaData metaData) {
-            this.indices.putAll(metaData.indices);
-            this.recoveredFromGateway = metaData.recoveredFromGateway();
+        public Builder put(IndexTemplateMetaData.Builder template) {
+            return put(template.build());
+        }
+
+        public Builder put(IndexTemplateMetaData template) {
+            templates.put(template.name(), template);
+            return this;
+        }
+
+        public Builder remoteTemplate(String templateName) {
+            templates.remove(templateName);
             return this;
         }
 
@@ -277,7 +309,7 @@ public class MetaData implements Iterable<IndexMetaData> {
         }
 
         public MetaData build() {
-            return new MetaData(indices.immutableMap(), recoveredFromGateway);
+            return new MetaData(indices.immutableMap(), templates.immutableMap(), recoveredFromGateway);
         }
 
         public static String toXContent(MetaData metaData) throws IOException {
@@ -291,6 +323,12 @@ public class MetaData implements Iterable<IndexMetaData> {
         public static void toXContent(MetaData metaData, XContentBuilder builder, ToXContent.Params params) throws IOException {
             builder.startObject("meta-data");
 
+            builder.startObject("templates");
+            for (IndexTemplateMetaData template : metaData.templates().values()) {
+                IndexTemplateMetaData.Builder.toXContent(template, builder, params);
+            }
+            builder.endObject();
+
             builder.startObject("indices");
             for (IndexMetaData indexMetaData : metaData) {
                 IndexMetaData.Builder.toXContent(indexMetaData, builder, params);
@@ -300,7 +338,7 @@ public class MetaData implements Iterable<IndexMetaData> {
             builder.endObject();
         }
 
-        public static MetaData fromXContent(XContentParser parser, @Nullable Settings globalSettings) throws IOException {
+        public static MetaData fromXContent(XContentParser parser) throws IOException {
             Builder builder = new Builder();
 
             XContentParser.Token token = parser.currentToken();
@@ -320,7 +358,11 @@ public class MetaData implements Iterable<IndexMetaData> {
                 } else if (token == XContentParser.Token.START_OBJECT) {
                     if ("indices".equals(currentFieldName)) {
                         while ((token = parser.nextToken()) != XContentParser.Token.END_OBJECT) {
-                            builder.put(IndexMetaData.Builder.fromXContent(parser, globalSettings));
+                            builder.put(IndexMetaData.Builder.fromXContent(parser));
+                        }
+                    } else if ("templates".equals(currentFieldName)) {
+                        while ((token = parser.nextToken()) != XContentParser.Token.END_OBJECT) {
+                            builder.put(IndexTemplateMetaData.Builder.fromXContent(parser));
                         }
                     }
                 }
@@ -328,13 +370,17 @@ public class MetaData implements Iterable<IndexMetaData> {
             return builder.build();
         }
 
-        public static MetaData readFrom(StreamInput in, @Nullable Settings globalSettings) throws IOException {
+        public static MetaData readFrom(StreamInput in) throws IOException {
             Builder builder = new Builder();
             // we only serialize it using readFrom, not in to/from XContent
             builder.recoveredFromGateway = in.readBoolean();
             int size = in.readVInt();
             for (int i = 0; i < size; i++) {
-                builder.put(IndexMetaData.Builder.readFrom(in, globalSettings));
+                builder.put(IndexMetaData.Builder.readFrom(in));
+            }
+            size = in.readVInt();
+            for (int i = 0; i < size; i++) {
+                builder.put(IndexTemplateMetaData.Builder.readFrom(in));
             }
             return builder.build();
         }
@@ -344,6 +390,10 @@ public class MetaData implements Iterable<IndexMetaData> {
             out.writeVInt(metaData.indices.size());
             for (IndexMetaData indexMetaData : metaData) {
                 IndexMetaData.Builder.writeTo(indexMetaData, out);
+            }
+            out.writeVInt(metaData.templates.size());
+            for (IndexTemplateMetaData template : metaData.templates.values()) {
+                IndexTemplateMetaData.Builder.writeTo(template, out);
             }
         }
     }

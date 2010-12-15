@@ -23,13 +23,13 @@ import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.action.FailedNodeException;
 import org.elasticsearch.cluster.*;
 import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.IndexTemplateMetaData;
 import org.elasticsearch.cluster.metadata.MetaData;
 import org.elasticsearch.cluster.metadata.MetaDataCreateIndexService;
 import org.elasticsearch.cluster.routing.IndexRoutingTable;
 import org.elasticsearch.cluster.routing.IndexShardRoutingTable;
 import org.elasticsearch.cluster.routing.MutableShardRouting;
 import org.elasticsearch.cluster.routing.RoutingNode;
-import org.elasticsearch.common.collect.ImmutableSet;
 import org.elasticsearch.common.collect.Sets;
 import org.elasticsearch.common.component.AbstractLifecycleComponent;
 import org.elasticsearch.common.inject.Inject;
@@ -42,10 +42,10 @@ import org.elasticsearch.discovery.Discovery;
 import org.elasticsearch.env.NodeEnvironment;
 import org.elasticsearch.gateway.Gateway;
 import org.elasticsearch.gateway.GatewayException;
-import org.elasticsearch.gateway.GatewayService;
 import org.elasticsearch.index.gateway.local.LocalIndexGatewayModule;
 
 import java.io.*;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -168,6 +168,11 @@ public class LocalGateway extends AbstractLifecycleComponent<Gateway> implements
                 // mark the metadata as read from gateway
                 metaDataBuilder.markAsRecoveredFromGateway();
 
+                // add the index templates
+                for (Map.Entry<String, IndexTemplateMetaData> entry : state.metaData().templates().entrySet()) {
+                    metaDataBuilder.put(entry.getValue());
+                }
+
                 return newClusterStateBuilder().state(currentState)
                         .version(state.version())
                         .metaData(metaDataBuilder).build();
@@ -178,11 +183,10 @@ public class LocalGateway extends AbstractLifecycleComponent<Gateway> implements
                 // the meta data per index, since we create the index and it will be added automatically
                 for (final IndexMetaData indexMetaData : state.metaData()) {
                     try {
-                        createIndexService.createIndex(new MetaDataCreateIndexService.Request("gateway", indexMetaData.index())
+                        createIndexService.createIndex(new MetaDataCreateIndexService.Request(MetaDataCreateIndexService.Request.Origin.GATEWAY, "gateway", indexMetaData.index())
                                 .settings(indexMetaData.settings())
                                 .mappingsMetaData(indexMetaData.mappings())
                                 .state(indexMetaData.state())
-                                .blocks(ImmutableSet.of(GatewayService.INDEX_NOT_RECOVERED_BLOCK))
                                 .timeout(timeValueSeconds(30)),
 
                                 new MetaDataCreateIndexService.Listener() {
@@ -278,7 +282,11 @@ public class LocalGateway extends AbstractLifecycleComponent<Gateway> implements
                         builder.state(currentStartedShards);
                     }
                     builder.version(event.state().version());
-                    // remove from the current state all the shards that are primary and started, we won't need them anymore
+                    // remove from the current state all the shards that are primary and started somewhere, we won't need them anymore
+                    // and if they are still here, we will add them in the next phase
+
+                    // Also note, this works well when closing an index, since a closed index will have no routing shards entries
+                    // so they won't get removed (we want to keep the fact that those shards are allocated on this node if needed)
                     for (IndexRoutingTable indexRoutingTable : event.state().routingTable()) {
                         for (IndexShardRoutingTable indexShardRoutingTable : indexRoutingTable) {
                             if (indexShardRoutingTable.primaryShard().active()) {
@@ -431,7 +439,7 @@ public class LocalGateway extends AbstractLifecycleComponent<Gateway> implements
         XContentParser parser = null;
         try {
             parser = XContentFactory.xContent(XContentType.JSON).createParser(data);
-            return LocalGatewayMetaState.Builder.fromXContent(parser, settings);
+            return LocalGatewayMetaState.Builder.fromXContent(parser);
         } finally {
             if (parser != null) {
                 parser.close();
@@ -443,7 +451,7 @@ public class LocalGateway extends AbstractLifecycleComponent<Gateway> implements
         XContentParser parser = null;
         try {
             parser = XContentFactory.xContent(XContentType.JSON).createParser(data);
-            return LocalGatewayStartedShards.Builder.fromXContent(parser, settings);
+            return LocalGatewayStartedShards.Builder.fromXContent(parser);
         } finally {
             if (parser != null) {
                 parser.close();

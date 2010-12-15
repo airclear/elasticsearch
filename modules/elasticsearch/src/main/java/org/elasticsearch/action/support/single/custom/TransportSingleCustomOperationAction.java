@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -17,7 +17,7 @@
  * under the License.
  */
 
-package org.elasticsearch.action.support.single;
+package org.elasticsearch.action.support.single.custom;
 
 import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.action.ActionListener;
@@ -34,7 +34,6 @@ import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
 import org.elasticsearch.common.io.stream.Streamable;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.indices.IndicesService;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.transport.*;
 
@@ -43,22 +42,19 @@ import java.io.IOException;
 /**
  * @author kimchy (shay.banon)
  */
-public abstract class TransportSingleOperationAction<Request extends SingleOperationRequest, Response extends ActionResponse> extends BaseAction<Request, Response> {
+public abstract class TransportSingleCustomOperationAction<Request extends SingleCustomOperationRequest, Response extends ActionResponse> extends BaseAction<Request, Response> {
 
     protected final ClusterService clusterService;
 
     protected final TransportService transportService;
 
-    protected final IndicesService indicesService;
-
     protected final ThreadPool threadPool;
 
-    protected TransportSingleOperationAction(Settings settings, ThreadPool threadPool, ClusterService clusterService, TransportService transportService, IndicesService indicesService) {
+    protected TransportSingleCustomOperationAction(Settings settings, ThreadPool threadPool, ClusterService clusterService, TransportService transportService) {
         super(settings);
         this.clusterService = clusterService;
         this.transportService = transportService;
         this.threadPool = threadPool;
-        this.indicesService = indicesService;
 
         transportService.registerHandler(transportAction(), new TransportHandler());
         transportService.registerHandler(transportShardAction(), new ShardTransportHandler());
@@ -71,6 +67,8 @@ public abstract class TransportSingleOperationAction<Request extends SingleOpera
     protected abstract String transportAction();
 
     protected abstract String transportShardAction();
+
+    protected abstract ShardsIterator shards(ClusterState state, Request request);
 
     protected abstract Response shardOperation(Request request, int shardId) throws ElasticSearchException;
 
@@ -97,16 +95,10 @@ public abstract class TransportSingleOperationAction<Request extends SingleOpera
             this.listener = listener;
 
             ClusterState clusterState = clusterService.state();
-
             nodes = clusterState.nodes();
 
-            // update to the concrete shard to use
-            request.index(clusterState.metaData().concreteIndex(request.index()));
-
             checkBlock(request, clusterState);
-
-            this.shardsIt = clusterService.operationRouting()
-                    .getShards(clusterState, request.index(), request.type(), request.id(), request.routing());
+            this.shardsIt = shards(clusterState, request);
         }
 
         public void start() {
@@ -115,7 +107,7 @@ public abstract class TransportSingleOperationAction<Request extends SingleOpera
 
         private void onFailure(ShardRouting shardRouting, Exception e) {
             if (logger.isTraceEnabled() && e != null) {
-                logger.trace(shardRouting.shortSummary() + ": Failed to get [" + request.type() + "#" + request.id() + "]", e);
+                logger.trace(shardRouting.shortSummary() + ": Failed to execute [" + request + "]", e);
             }
             perform(e);
         }
@@ -203,10 +195,10 @@ public abstract class TransportSingleOperationAction<Request extends SingleOpera
             if (!shardsIt.hasNextActive()) {
                 Exception failure = lastException;
                 if (failure == null) {
-                    failure = new NoShardAvailableActionException(shardsIt.shardId(), "No shard available for [" + request.type() + "#" + request.id() + "]");
+                    failure = new NoShardAvailableActionException(null, "No shard available for [" + request + "]");
                 } else {
                     if (logger.isDebugEnabled()) {
-                        logger.debug(shardsIt.shardId() + ": Failed to get [" + request.type() + "#" + request.id() + "]", failure);
+                        logger.debug("failed to execute [" + request + "]", failure);
                     }
                 }
                 if (request.listenerThreaded()) {

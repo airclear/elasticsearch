@@ -7,6 +7,7 @@
       <w>appendable</w>
       <w>args</w>
       <w>asciifolding</w>
+      <w>async</w>
       <w>attr</w>
       <w>auth</w>
       <w>banon</w>
@@ -152,6 +153,7 @@
       <w>unmatch</w>
       <w>unregister</w>
       <w>uptime</w>
+      <w>userid</w>
       <w>uuid</w>
       <w>versioned</w>
       <w>warmup</w>

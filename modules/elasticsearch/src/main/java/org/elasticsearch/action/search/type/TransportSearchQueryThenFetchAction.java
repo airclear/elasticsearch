@@ -171,13 +171,13 @@ public class TransportSearchQueryThenFetchAction extends TransportSearchTypeActi
             }
         }
 
-        private void innerFinishHim() {
+        private void innerFinishHim() throws Exception {
             InternalSearchResponse internalResponse = searchPhaseController.merge(sortedShardList, queryResults, fetchResults);
             String scrollId = null;
             if (request.scroll() != null) {
                 scrollId = TransportSearchHelper.buildScrollId(request.searchType(), queryResults.values());
             }
-            invokeListener(new SearchResponse(internalResponse, scrollId, expectedSuccessfulOps, successulOps.get(), buildShardFailures()));
+            invokeListener(new SearchResponse(internalResponse, scrollId, expectedSuccessfulOps, successulOps.get(), buildTookInMillis(), buildShardFailures()));
         }
     }
 }

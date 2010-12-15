@@ -23,6 +23,8 @@ import org.elasticsearch.action.ActionFuture;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.action.admin.indices.alias.IndicesAliasesRequest;
 import org.elasticsearch.action.admin.indices.alias.IndicesAliasesResponse;
+import org.elasticsearch.action.admin.indices.analyze.AnalyzeRequest;
+import org.elasticsearch.action.admin.indices.analyze.AnalyzeResponse;
 import org.elasticsearch.action.admin.indices.cache.clear.ClearIndicesCacheRequest;
 import org.elasticsearch.action.admin.indices.cache.clear.ClearIndicesCacheResponse;
 import org.elasticsearch.action.admin.indices.close.CloseIndexRequest;
@@ -49,7 +51,12 @@ import org.elasticsearch.action.admin.indices.settings.UpdateSettingsRequest;
 import org.elasticsearch.action.admin.indices.settings.UpdateSettingsResponse;
 import org.elasticsearch.action.admin.indices.status.IndicesStatusRequest;
 import org.elasticsearch.action.admin.indices.status.IndicesStatusResponse;
+import org.elasticsearch.action.admin.indices.template.delete.DeleteIndexTemplateRequest;
+import org.elasticsearch.action.admin.indices.template.delete.DeleteIndexTemplateResponse;
+import org.elasticsearch.action.admin.indices.template.put.PutIndexTemplateRequest;
+import org.elasticsearch.action.admin.indices.template.put.PutIndexTemplateResponse;
 import org.elasticsearch.client.action.admin.indices.alias.IndicesAliasesRequestBuilder;
+import org.elasticsearch.client.action.admin.indices.analyze.AnalyzeRequestBuilder;
 import org.elasticsearch.client.action.admin.indices.cache.clear.ClearIndicesCacheRequestBuilder;
 import org.elasticsearch.client.action.admin.indices.close.CloseIndexRequestBuilder;
 import org.elasticsearch.client.action.admin.indices.create.CreateIndexRequestBuilder;
@@ -63,6 +70,8 @@ import org.elasticsearch.client.action.admin.indices.optimize.OptimizeRequestBui
 import org.elasticsearch.client.action.admin.indices.refresh.RefreshRequestBuilder;
 import org.elasticsearch.client.action.admin.indices.settings.UpdateSettingsRequestBuilder;
 import org.elasticsearch.client.action.admin.indices.status.IndicesStatusRequestBuilder;
+import org.elasticsearch.client.action.admin.indices.template.delete.DeleteIndexTemplateRequestBuilder;
+import org.elasticsearch.client.action.admin.indices.template.put.PutIndexTemplateRequestBuilder;
 
 /**
  * Administrative actions/operations against indices.
@@ -399,4 +408,56 @@ public interface IndicesAdminClient {
      * Update indices settings.
      */
     UpdateSettingsRequestBuilder prepareUpdateSettings(String... indices);
+
+    /**
+     * Analyze text under the provided index.
+     */
+    ActionFuture<AnalyzeResponse> analyze(AnalyzeRequest request);
+
+    /**
+     * Analyze text under the provided index.
+     */
+    void analyze(AnalyzeRequest request, ActionListener<AnalyzeResponse> listener);
+
+    /**
+     * Analyze text under the provided index.
+     *
+     * @param index The index name
+     * @param text  The text to analyze
+     */
+    AnalyzeRequestBuilder prepareAnalyze(String index, String text);
+
+    /**
+     * Puts an index template.
+     */
+    ActionFuture<PutIndexTemplateResponse> putTemplate(PutIndexTemplateRequest request);
+
+    /**
+     * Puts an index template.
+     */
+    void putTemplate(PutIndexTemplateRequest request, ActionListener<PutIndexTemplateResponse> listener);
+
+    /**
+     * Puts an index template.
+     *
+     * @param name The name of the template.
+     */
+    PutIndexTemplateRequestBuilder preparePutTemplate(String name);
+
+    /**
+     * Deletes index template.
+     */
+    ActionFuture<DeleteIndexTemplateResponse> deleteTemplate(DeleteIndexTemplateRequest request);
+
+    /**
+     * Deletes an index template.
+     */
+    void deleteTemplate(DeleteIndexTemplateRequest request, ActionListener<DeleteIndexTemplateResponse> listener);
+
+    /**
+     * Deletes an index template.
+     *
+     * @param name The name of the template.
+     */
+    DeleteIndexTemplateRequestBuilder prepareDeleteTemplate(String name);
 }

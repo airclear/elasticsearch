@@ -113,7 +113,7 @@ public class GeoBoundingBoxTests extends AbstractNodesTests {
         client.admin().indices().prepareRefresh().execute().actionGet();
 
         SearchResponse searchResponse = client.prepareSearch() // from NY
-                .setQuery(filtered(matchAllQuery(), geoBoundingBoxFilter("location").topLeft(40.73, -74.1).bottomRight(40.717, -73.99)))
+                .setQuery(filteredQuery(matchAllQuery(), geoBoundingBoxFilter("location").topLeft(40.73, -74.1).bottomRight(40.717, -73.99)))
                 .execute().actionGet();
         assertThat(searchResponse.hits().getTotalHits(), equalTo(2l));
         assertThat(searchResponse.hits().hits().length, equalTo(2));
@@ -178,32 +178,75 @@ public class GeoBoundingBoxTests extends AbstractNodesTests {
         client.admin().indices().prepareRefresh().execute().actionGet();
 
         SearchResponse searchResponse = client.prepareSearch()
-                .setQuery(filtered(matchAllQuery(), geoBoundingBoxFilter("location").topLeft(41, -11).bottomRight(40, 9)))
+                .setQuery(filteredQuery(matchAllQuery(), geoBoundingBoxFilter("location").topLeft(41, -11).bottomRight(40, 9)))
                 .execute().actionGet();
         assertThat(searchResponse.hits().getTotalHits(), equalTo(1l));
         assertThat(searchResponse.hits().hits().length, equalTo(1));
         assertThat(searchResponse.hits().getAt(0).id(), equalTo("2"));
 
         searchResponse = client.prepareSearch()
-                .setQuery(filtered(matchAllQuery(), geoBoundingBoxFilter("location").topLeft(41, -9).bottomRight(40, 11)))
+                .setQuery(filteredQuery(matchAllQuery(), geoBoundingBoxFilter("location").topLeft(41, -9).bottomRight(40, 11)))
                 .execute().actionGet();
         assertThat(searchResponse.hits().getTotalHits(), equalTo(1l));
         assertThat(searchResponse.hits().hits().length, equalTo(1));
         assertThat(searchResponse.hits().getAt(0).id(), equalTo("3"));
 
         searchResponse = client.prepareSearch()
-                .setQuery(filtered(matchAllQuery(), geoBoundingBoxFilter("location").topLeft(11, 171).bottomRight(1, -169)))
+                .setQuery(filteredQuery(matchAllQuery(), geoBoundingBoxFilter("location").topLeft(11, 171).bottomRight(1, -169)))
                 .execute().actionGet();
         assertThat(searchResponse.hits().getTotalHits(), equalTo(1l));
         assertThat(searchResponse.hits().hits().length, equalTo(1));
         assertThat(searchResponse.hits().getAt(0).id(), equalTo("5"));
 
         searchResponse = client.prepareSearch()
-                .setQuery(filtered(matchAllQuery(), geoBoundingBoxFilter("location").topLeft(9, 169).bottomRight(-1, -171)))
+                .setQuery(filteredQuery(matchAllQuery(), geoBoundingBoxFilter("location").topLeft(9, 169).bottomRight(-1, -171)))
                 .execute().actionGet();
         assertThat(searchResponse.hits().getTotalHits(), equalTo(1l));
         assertThat(searchResponse.hits().hits().length, equalTo(1));
         assertThat(searchResponse.hits().getAt(0).id(), equalTo("9"));
+    }
+
+    @Test public void limit2BoundingBoxTest() throws Exception {
+        try {
+            client.admin().indices().prepareDelete("test").execute().actionGet();
+        } catch (Exception e) {
+            // ignore
+        }
+        String mapping = XContentFactory.jsonBuilder().startObject().startObject("type1")
+                .startObject("properties").startObject("location").field("type", "geo_point").field("lat_lon", true).endObject().endObject()
+                .endObject().endObject().string();
+        client.admin().indices().prepareCreate("test").addMapping("type1", mapping).setSettings(settingsBuilder().put("number_of_shards", "1")).execute().actionGet();
+        client.admin().cluster().prepareHealth().setWaitForGreenStatus().execute().actionGet();
+
+        client.prepareIndex("test", "type1", "1").setSource(jsonBuilder().startObject()
+                .field("userid", 880)
+                .field("title", "Place in Stockholm")
+                .startObject("location").field("lat", 59.328355000000002).field("lon", 18.036842).endObject()
+                .endObject())
+                .setRefresh(true)
+                .execute().actionGet();
+
+        client.prepareIndex("test", "type1", "2").setSource(jsonBuilder().startObject()
+                .field("userid", 534)
+                .field("title", "Place in Montreal")
+                .startObject("location").field("lat", 45.509526999999999).field("lon", -73.570986000000005).endObject()
+                .endObject())
+                .setRefresh(true)
+                .execute().actionGet();
+
+        SearchResponse searchResponse = client.prepareSearch()
+                .setQuery(
+                        filteredQuery(termQuery("userid", 880),
+                                geoBoundingBoxFilter("location").topLeft(74.579421999999994, 143.5).bottomRight(-66.668903999999998, 113.96875))
+                ).execute().actionGet();
+        assertThat(searchResponse.hits().totalHits(), equalTo(1l));
+
+        searchResponse = client.prepareSearch()
+                .setQuery(
+                        filteredQuery(termQuery("userid", 534),
+                                geoBoundingBoxFilter("location").topLeft(74.579421999999994, 143.5).bottomRight(-66.668903999999998, 113.96875))
+                ).execute().actionGet();
+        assertThat(searchResponse.hits().totalHits(), equalTo(1l));
     }
 }
 

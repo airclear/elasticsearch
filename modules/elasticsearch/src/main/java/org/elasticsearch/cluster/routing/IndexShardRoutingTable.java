@@ -28,9 +28,7 @@ import org.elasticsearch.common.util.concurrent.jsr166y.ThreadLocalRandom;
 import org.elasticsearch.index.shard.ShardId;
 
 import java.io.IOException;
-import java.util.Iterator;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.elasticsearch.common.collect.Lists.*;
@@ -46,10 +44,21 @@ public class IndexShardRoutingTable implements Iterable<ShardRouting> {
 
     final AtomicInteger counter;
 
-    IndexShardRoutingTable(ShardId shardId, ImmutableList<ShardRouting> shards) {
+    final boolean allocatedPostApi;
+
+    IndexShardRoutingTable(ShardId shardId, ImmutableList<ShardRouting> shards, boolean allocatedPostApi) {
         this.shardId = shardId;
         this.shards = shards;
+        this.allocatedPostApi = allocatedPostApi;
         this.counter = new AtomicInteger(ThreadLocalRandom.current().nextInt(shards.size()));
+    }
+
+    /**
+     * Has this shard group primary shard been allocated post API creation. Will be set to
+     * <tt>true</tt> if it was created because of recovery action.
+     */
+    public boolean allocatedPostApi() {
+        return allocatedPostApi;
     }
 
     public ShardId shardId() {
@@ -90,12 +99,12 @@ public class IndexShardRoutingTable implements Iterable<ShardRouting> {
         return count;
     }
 
-    public ShardsIterator shardsIt() {
-        return new IndexShardsIterator(0);
+    public ShardIterator shardsIt() {
+        return new PlainShardIterator(shardId, shards);
     }
 
-    public ShardsIterator shardsRandomIt() {
-        return new IndexShardsIterator(nextCounter());
+    public ShardIterator shardsRandomIt() {
+        return new PlainShardIterator(shardId, shards, counter.getAndIncrement());
     }
 
     public ShardRouting primaryShard() {
@@ -129,186 +138,24 @@ public class IndexShardRoutingTable implements Iterable<ShardRouting> {
         return shards;
     }
 
-    int nextCounter() {
-        return counter.getAndIncrement();
-    }
-
-    ShardRouting shardModulo(int shardId) {
-        return shards.get((Math.abs(shardId) % size()));
-    }
-
-    /**
-     * <p>The class can be used from different threads, though not designed to be used concurrently
-     * from different threads.
-     */
-    class IndexShardsIterator implements ShardsIterator, Iterator<ShardRouting> {
-
-        private final int origIndex;
-
-        private volatile int index;
-
-        private volatile int counter = 0;
-
-        private IndexShardsIterator(int index) {
-            this.origIndex = index;
-            this.index = index;
-        }
-
-        @Override public Iterator<ShardRouting> iterator() {
-            return this;
-        }
-
-        @Override public ShardsIterator reset() {
-            counter = 0;
-            index = origIndex;
-            return this;
-        }
-
-        @Override public boolean hasNext() {
-            return counter < size();
-        }
-
-        @Override public ShardRouting next() throws NoSuchElementException {
-            if (!hasNext()) {
-                throw new NoSuchElementException("No shard found");
-            }
-            counter++;
-            return shardModulo(index++);
-        }
-
-        @Override public void remove() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override public int size() {
-            return IndexShardRoutingTable.this.size();
-        }
-
-        @Override public int sizeActive() {
-            int shardsActive = 0;
-            for (ShardRouting shardRouting : IndexShardRoutingTable.this.shards()) {
-                if (shardRouting.active()) {
-                    shardsActive++;
-                }
-            }
-            return shardsActive;
-        }
-
-        @Override public boolean hasNextActive() {
-            int counter = this.counter;
-            int index = this.index;
-            while (counter++ < size()) {
-                ShardRouting shardRouting = shardModulo(index++);
-                if (shardRouting.active()) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        @Override public ShardRouting nextActive() throws NoSuchElementException {
-            ShardRouting shardRouting = nextActiveOrNull();
-            if (shardRouting == null) {
-                throw new NoSuchElementException("No active shard found");
-            }
-            return shardRouting;
-        }
-
-        @Override public ShardRouting nextActiveOrNull() throws NoSuchElementException {
-            int counter = this.counter;
-            int index = this.index;
-            while (counter++ < size()) {
-                ShardRouting shardRouting = shardModulo(index++);
-                if (shardRouting.active()) {
-                    this.counter = counter;
-                    this.index = index;
-                    return shardRouting;
-                }
-            }
-            this.counter = counter;
-            this.index = index;
-            return null;
-        }
-
-        @Override public int sizeAssigned() {
-            int shardsAssigned = 0;
-            for (ShardRouting shardRouting : IndexShardRoutingTable.this.shards()) {
-                if (shardRouting.assignedToNode()) {
-                    shardsAssigned++;
-                }
-            }
-            return shardsAssigned;
-        }
-
-        @Override public boolean hasNextAssigned() {
-            int counter = this.counter;
-            int index = this.index;
-            while (counter++ < size()) {
-                ShardRouting shardRouting = shardModulo(index++);
-                if (shardRouting.assignedToNode()) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        @Override public ShardRouting nextAssigned() throws NoSuchElementException {
-            ShardRouting shardRouting = nextAssignedOrNull();
-            if (shardRouting == null) {
-                throw new NoSuchElementException("No assigned shard found");
-            }
-            return shardRouting;
-        }
-
-        @Override public ShardRouting nextAssignedOrNull() {
-            int counter = this.counter;
-            int index = this.index;
-            while (counter++ < size()) {
-                ShardRouting shardRouting = shardModulo(index++);
-                if (shardRouting.assignedToNode()) {
-                    this.counter = counter;
-                    this.index = index;
-                    return shardRouting;
-                }
-            }
-            this.counter = counter;
-            this.index = index;
-            return null;
-        }
-
-        @Override public ShardId shardId() {
-            return IndexShardRoutingTable.this.shardId();
-        }
-
-        @Override public boolean equals(Object o) {
-            if (this == o) return true;
-
-            ShardsIterator that = (ShardsIterator) o;
-
-            if (shardId != null ? !shardId.equals(that.shardId()) : that.shardId() != null) return false;
-
-            return true;
-        }
-
-        @Override public int hashCode() {
-            return shardId != null ? shardId.hashCode() : 0;
-        }
-    }
-
     public static class Builder {
 
         private ShardId shardId;
 
         private final List<ShardRouting> shards;
 
+        private boolean allocatedPostApi;
+
         public Builder(IndexShardRoutingTable indexShard) {
             this.shardId = indexShard.shardId;
             this.shards = newArrayList(indexShard.shards);
+            this.allocatedPostApi = indexShard.allocatedPostApi();
         }
 
-        public Builder(ShardId shardId) {
+        public Builder(ShardId shardId, boolean allocatedPostApi) {
             this.shardId = shardId;
             this.shards = newArrayList();
+            this.allocatedPostApi = allocatedPostApi;
         }
 
         public Builder addShard(ImmutableShardRouting shardEntry) {
@@ -330,7 +177,15 @@ public class IndexShardRoutingTable implements Iterable<ShardRouting> {
         }
 
         public IndexShardRoutingTable build() {
-            return new IndexShardRoutingTable(shardId, ImmutableList.copyOf(shards));
+            // we can automatically set allocatedPostApi to true if the primary is active
+            if (!allocatedPostApi) {
+                for (ShardRouting shardRouting : shards) {
+                    if (shardRouting.primary() && shardRouting.active()) {
+                        allocatedPostApi = true;
+                    }
+                }
+            }
+            return new IndexShardRoutingTable(shardId, ImmutableList.copyOf(shards), allocatedPostApi);
         }
 
         public static IndexShardRoutingTable readFrom(StreamInput in) throws IOException {
@@ -340,8 +195,8 @@ public class IndexShardRoutingTable implements Iterable<ShardRouting> {
 
         public static IndexShardRoutingTable readFromThin(StreamInput in, String index) throws IOException {
             int iShardId = in.readVInt();
-            ShardId shardId = new ShardId(index, iShardId);
-            Builder builder = new Builder(shardId);
+            boolean allocatedPostApi = in.readBoolean();
+            Builder builder = new Builder(new ShardId(index, iShardId), allocatedPostApi);
 
             int size = in.readVInt();
             for (int i = 0; i < size; i++) {
@@ -359,6 +214,8 @@ public class IndexShardRoutingTable implements Iterable<ShardRouting> {
 
         public static void writeToThin(IndexShardRoutingTable indexShard, StreamOutput out) throws IOException {
             out.writeVInt(indexShard.shardId.id());
+            out.writeBoolean(indexShard.allocatedPostApi());
+
             out.writeVInt(indexShard.shards.size());
             for (ShardRouting entry : indexShard) {
                 entry.writeToThin(out);

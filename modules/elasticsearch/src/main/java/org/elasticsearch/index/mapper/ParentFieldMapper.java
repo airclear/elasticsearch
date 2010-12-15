@@ -7,7 +7,7 @@
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
@@ -17,21 +17,25 @@
  * under the License.
  */
 
-package org.elasticsearch.search.fetch;
+package org.elasticsearch.index.mapper;
 
-import org.elasticsearch.common.xcontent.XContentParser;
-import org.elasticsearch.search.SearchParseElement;
-import org.elasticsearch.search.internal.SearchContext;
+import org.apache.lucene.index.Term;
+import org.elasticsearch.common.util.concurrent.ThreadSafe;
 
 /**
  * @author kimchy (shay.banon)
  */
-public class ExplainParseElement implements SearchParseElement {
+@ThreadSafe
+public interface ParentFieldMapper extends FieldMapper<Uid>, InternalMapper {
 
-    @Override public void parse(XContentParser parser, SearchContext context) throws Exception {
-        XContentParser.Token token = parser.currentToken();
-        if (token.isValue()) {
-            context.explain(parser.booleanValue());
-        }
-    }
+    public static final String NAME = "_parent";
+
+    /**
+     * The type of the parent doc.
+     */
+    String type();
+
+    Term term(String type, String id);
+
+    Term term(String uid);
 }
